@@ -36,7 +36,6 @@ env:
   WORKSPACE_REPO: fileuni/FileUni-WorkSpace
   OUTPUT_DIR: /tmp/FileUniRelease
   DEFAULT_WORKSPACE_REF: main
-  CARGO_TOOLS_ROOT: /home/runner/.cargo-tools
 
 jobs:
   resolve-meta:
@@ -82,11 +81,37 @@ jobs:
             --fallback-ref "${{ vars.WORKSPACE_DEFAULT_REF }}" \
             --default-fallback-ref "${DEFAULT_WORKSPACE_REF}"
 
-  build-linux:
+  build:
     needs: resolve-meta
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      max-parallel: 2
+      matrix:
+        include:
+          - job_name: linux
+            runs_on: ubuntu-latest
+            cargo_tools_root: /home/runner/.cargo-tools
+            target_include_glob: ""
+            target_exclude_glob: "*-apple-darwin"
+            skip_system_deps: "false"
+            skip_fpm: "false"
+            bun_cache_path: ~/.bun/install/cache
+            appimage_extract_and_run: "1"
+          - job_name: macos
+            runs_on: macos-14
+            cargo_tools_root: /Users/runner/.cargo-tools
+            target_include_glob: "*-apple-darwin"
+            target_exclude_glob: ""
+            skip_system_deps: "true"
+            skip_fpm: "true"
+            bun_cache_path: ~/Library/Caches/Bun
+            appimage_extract_and_run: "0"
+    runs-on: ${{ matrix.runs_on }}
     env:
-      FILEUNI_TARGET_EXCLUDE_GLOB: "*-apple-darwin"
+      FILEUNI_TARGET_INCLUDE_GLOB: ${{ matrix.target_include_glob }}
+      FILEUNI_TARGET_EXCLUDE_GLOB: ${{ matrix.target_exclude_glob }}
+      FILEUNI_ENABLE_DARWIN_CROSS: "1"
+      CARGO_TOOLS_ROOT: ${{ matrix.cargo_tools_root }}
     steps:
       - name: Checkout resolved workspace source ref
         uses: actions/checkout@v4
@@ -114,7 +139,7 @@ jobs:
       - name: Cache cargo installed tools
         uses: actions/cache@v4
         with:
-          path: /home/runner/.cargo-tools
+          path: ${{ matrix.cargo_tools_root }}
           key: ${{ runner.os }}-cargo-tools-v2-tauri2_10
           restore-keys: |
             ${{ runner.os }}-cargo-tools-v2-
@@ -148,16 +173,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: workspace/target
-          key: ${{ runner.os }}-cargo-target-linux-${{ needs.resolve-meta.outputs.resolved_mode }}-${{ hashFiles('workspace/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-target-${{ matrix.job_name }}-${{ needs.resolve-meta.outputs.resolved_mode }}-${{ hashFiles('workspace/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-target-linux-${{ needs.resolve-meta.outputs.resolved_mode }}-
-            ${{ runner.os }}-cargo-target-linux-
+            ${{ runner.os }}-cargo-target-${{ matrix.job_name }}-${{ needs.resolve-meta.outputs.resolved_mode }}-
+            ${{ runner.os }}-cargo-target-${{ matrix.job_name }}-
             ${{ runner.os }}-cargo-target-
 
       - name: Cache Bun package downloads
         uses: actions/cache@v4
         with:
-          path: ~/.bun/install/cache
+          path: ${{ matrix.bun_cache_path }}
           key: ${{ runner.os }}-bun-cache-${{ hashFiles('workspace/**/bun.lock', 'workspace/**/bun.lockb') }}
           restore-keys: |
             ${{ runner.os }}-bun-cache-
@@ -169,13 +194,15 @@ jobs:
           set -euo pipefail
           zig build run -- ci:prepare-tools \
             --cargo-tools-root "${CARGO_TOOLS_ROOT}" \
-            --tauri-version "~2.10"
+            --tauri-version "~2.10" \
+            --skip-system-deps="${{ matrix.skip_system_deps }}" \
+            --skip-fpm="${{ matrix.skip_fpm }}"
 
-      - name: Build release artifacts (Linux host)
+      - name: Build release artifacts (${{ matrix.job_name }})
         shell: bash
         working-directory: workspace/script-zig
         env:
-          APPIMAGE_EXTRACT_AND_RUN: "1"
+          APPIMAGE_EXTRACT_AND_RUN: ${{ matrix.appimage_extract_and_run }}
         run: |
           set -euo pipefail
           rm -rf "$OUTPUT_DIR"
@@ -207,9 +234,7 @@ jobs:
                     seen[clean] = 1
                     print clean
                     count++
-                    if (count >= 120) {
-                      exit
-                    }
+                    if (count >= 120) exit
                   }
                 }
               }
@@ -243,176 +268,15 @@ jobs:
             exit 1
           fi
 
-      - name: Upload Linux workflow artifacts
+      - name: Upload workflow artifacts (${{ matrix.job_name }})
         uses: actions/upload-artifact@v4
         with:
-          name: release-linux-${{ needs.resolve-meta.outputs.release_tag }}
-          path: |
-            /tmp/FileUniRelease/*
-
-  build-macos:
-    needs: [resolve-meta, build-linux]
-    runs-on: macos-14
-    env:
-      FILEUNI_TARGET_INCLUDE_GLOB: "*-apple-darwin"
-      FILEUNI_ENABLE_DARWIN_CROSS: "1"
-    steps:
-      - name: Checkout resolved workspace source ref
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.WORKSPACE_REPO }}
-          ref: ${{ needs.resolve-meta.outputs.resolved_ref }}
-          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
-          path: workspace
-          fetch-depth: 0
-          submodules: true
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
-
-      - name: Setup Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Setup Zig
-        uses: mlugg/setup-zig@v2
-        with:
-          version: "0.15.2"
-
-      - name: Cache cargo installed tools
-        uses: actions/cache@v4
-        with:
-          path: /Users/runner/.cargo-tools
-          key: ${{ runner.os }}-cargo-tools-v2-tauri2_10
-          restore-keys: |
-            ${{ runner.os }}-cargo-tools-v2-
-            ${{ runner.os }}-cargo-tools-
-
-      - name: Add cargo tools to PATH
-        shell: bash
-        run: |
-          set -euo pipefail
-          echo "/Users/runner/.cargo-tools/bin" >> "$GITHUB_PATH"
-
-      - name: Cache Cargo registry and git index
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('workspace/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-registry-
-
-      - name: Cache Rust target directory
-        uses: actions/cache@v4
-        with:
-          path: workspace/target
-          key: ${{ runner.os }}-cargo-target-macos-${{ needs.resolve-meta.outputs.resolved_mode }}-${{ hashFiles('workspace/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-target-macos-${{ needs.resolve-meta.outputs.resolved_mode }}-
-            ${{ runner.os }}-cargo-target-macos-
-            ${{ runner.os }}-cargo-target-
-
-      - name: Cache Bun package downloads
-        uses: actions/cache@v4
-        with:
-          path: ~/Library/Caches/Bun
-          key: ${{ runner.os }}-bun-cache-${{ hashFiles('workspace/**/bun.lock', 'workspace/**/bun.lockb') }}
-          restore-keys: |
-            ${{ runner.os }}-bun-cache-
-
-      - name: Prepare build dependencies and cross tools via Zig script
-        shell: bash
-        working-directory: workspace/script-zig
-        run: |
-          set -euo pipefail
-          zig build run -- ci:prepare-tools \
-            --cargo-tools-root "/Users/runner/.cargo-tools" \
-            --tauri-version "~2.10" \
-            --skip-system-deps=true \
-            --skip-fpm=true
-
-      - name: Build release artifacts (macOS host, Darwin targets only)
-        shell: bash
-        working-directory: workspace/script-zig
-        run: |
-          set -euo pipefail
-          rm -rf "$OUTPUT_DIR"
-          mkdir -p "$OUTPUT_DIR"
-          build_log="$(mktemp)"
-          assert_log="$(mktemp)"
-          trap 'rm -f "$build_log" "$assert_log"' EXIT
-
-          annotate_errors() {
-            awk '
-              {
-                print
-                clean=$0
-                gsub(/\x1B\[[0-9;]*[[:alpha:]]/, "", clean)
-                if (clean ~ /\[ERROR\]|build-all failures|target failed|command failed \(|Package .* failed|failed for|error:|fatal error:/) {
-                  print "::error::" clean
-                }
-              }
-            '
-          }
-
-          collect_failure_digest() {
-            awk '
-              {
-                clean=$0
-                gsub(/\x1B\[[0-9;]*[[:alpha:]]/, "", clean)
-                if (clean ~ /\[ERROR\]|fatal error:|error: could not compile|unsupported target|failed to find tool|unable to find dynamic system library|russh requires enabling either ring or aws-lc-rs|command failed \(|Package .* failed/) {
-                  if (!(clean in seen)) {
-                    seen[clean] = 1
-                    print clean
-                    count++
-                    if (count >= 120) {
-                      exit
-                    }
-                  }
-                }
-              }
-            ' "$@"
-          }
-
-          set +e
-          zig build run -- release:build-all "${{ needs.resolve-meta.outputs.resolved_mode }}" --output-dir "$OUTPUT_DIR" 2>&1 | tee "$build_log" | annotate_errors
-          build_exit=${PIPESTATUS[0]}
-          if [ "$build_exit" -eq 0 ]; then
-            zig build run -- ci:assert-artifacts --output-dir "$OUTPUT_DIR" 2>&1 | tee "$assert_log" | annotate_errors
-            assert_exit=${PIPESTATUS[0]}
-          else
-            echo "skip ci:assert-artifacts because build failed"
-            assert_exit=1
-          fi
-          set -e
-
-          if [ "$build_exit" -ne 0 ] || [ "$assert_exit" -ne 0 ]; then
-            failure_digest="$(collect_failure_digest "$build_log" "$assert_log" | sed '/^[[:space:]]*$/d' || true)"
-            if [ -z "${failure_digest:-}" ]; then
-              failure_digest="No digest lines matched. Check full logs in this step."
-            fi
-            echo "::group::Failure digest"
-            printf '%s\n' "$failure_digest"
-            echo "::endgroup::"
-            while IFS= read -r line; do
-              [ -z "$line" ] && continue
-              echo "::error::$line"
-            done <<< "$failure_digest"
-            exit 1
-          fi
-
-      - name: Upload macOS workflow artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-macos-${{ needs.resolve-meta.outputs.release_tag }}
+          name: release-${{ matrix.job_name }}-${{ needs.resolve-meta.outputs.release_tag }}
           path: |
             /tmp/FileUniRelease/*
 
   publish:
-    needs: [resolve-meta, build-linux, build-macos]
+    needs: [resolve-meta, build]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout resolved workspace source ref
