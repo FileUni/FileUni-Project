@@ -178,6 +178,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-tools-v1-
 
+      - name: Cache default cargo bin tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-*
+            ~/.cargo/bin/tauri*
+          key: ${{ runner.os }}-cargo-bin-tools-v1
+          restore-keys: |
+            ${{ runner.os }}-cargo-bin-tools-
+
       - name: Add cargo tools to PATH
         shell: bash
         run: |
