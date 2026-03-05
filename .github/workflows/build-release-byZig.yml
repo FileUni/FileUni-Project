@@ -1,0 +1,318 @@
+name: Community Build and Release by Zig
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag in FileUni-Community (for example: v1.2.3)"
+        required: true
+        default: "0.0.1-alpha4.1"
+      workspace_ref:
+        description: "Source ref in fileuni/FileUni-WorkSpace (tag/branch/sha). Empty = release_tag"
+        required: false
+        default: ""
+      build_mode:
+        description: "Build mode override (full/medium/lite/minimal). Empty = vars.BUILD_MODE then minimal"
+        required: false
+        default: "minimal"
+      prerelease:
+        description: "Mark this GitHub release as pre-release"
+        type: boolean
+        required: false
+        default: true
+      trigger_source:
+        description: "Who triggered this release"
+        required: false
+        default: "manual"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fileuni-community-release-zig-${{ inputs.release_tag || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    env:
+      WORKSPACE_REPO: fileuni/FileUni-WorkSpace
+      OUTPUT_DIR: /tmp/FileUniRelease
+      DEFAULT_WORKSPACE_REF: main
+      CARGO_TOOLS_ROOT: /home/runner/.cargo-tools
+    steps:
+      - name: Checkout private workspace source (bootstrap)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ vars.WORKSPACE_DEFAULT_REF || env.DEFAULT_WORKSPACE_REF }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          fetch-depth: 0
+          submodules: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: "0.15.2"
+
+      - name: Resolve release metadata and source ref via Zig script
+        id: meta
+        env:
+          FILEUNI_WORKSPACE_PAT: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+        shell: bash
+        working-directory: workspace/script-zig
+        run: |
+          set -euo pipefail
+          zig build run -- ci:resolve-community-build \
+            --release-tag "${{ inputs.release_tag }}" \
+            --workspace-ref "${{ inputs.workspace_ref }}" \
+            --build-mode "${{ inputs.build_mode }}" \
+            --prerelease "${{ inputs.prerelease }}" \
+            --trigger-source "${{ inputs.trigger_source }}" \
+            --workspace-repo "${WORKSPACE_REPO}" \
+            --workspace-token-env "FILEUNI_WORKSPACE_PAT" \
+            --fallback-ref "${{ vars.WORKSPACE_DEFAULT_REF }}" \
+            --default-fallback-ref "${DEFAULT_WORKSPACE_REF}"
+
+      - name: Checkout resolved workspace source ref
+        shell: bash
+        working-directory: workspace/script-zig
+        run: |
+          set -euo pipefail
+          zig build run -- ci:checkout-workspace-ref \
+            --repo-path "." \
+            --ref "${{ steps.meta.outputs.resolved_ref }}"
+
+      - name: Cache cargo installed tools
+        uses: actions/cache@v4
+        with:
+          path: /home/runner/.cargo-tools
+          key: ${{ runner.os }}-cargo-tools-v2-tauri2_10
+          restore-keys: |
+            ${{ runner.os }}-cargo-tools-v2-
+            ${{ runner.os }}-cargo-tools-
+
+      - name: Cache cargo-binstall metadata
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/cargo-binstall
+          key: ${{ runner.os }}-cargo-binstall-v1
+          restore-keys: |
+            ${{ runner.os }}-cargo-binstall-
+
+      - name: Add cargo tools to PATH
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "${CARGO_TOOLS_ROOT}/bin" >> "$GITHUB_PATH"
+
+      - name: Cache Cargo registry and git index
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('workspace/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Cache Rust target directory
+        uses: actions/cache@v4
+        with:
+          path: workspace/target
+          key: ${{ runner.os }}-cargo-target-${{ steps.meta.outputs.resolved_mode }}-${{ hashFiles('workspace/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-${{ steps.meta.outputs.resolved_mode }}-
+            ${{ runner.os }}-cargo-target-
+
+      - name: Cache Bun package downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-cache-${{ hashFiles('workspace/**/bun.lock', 'workspace/**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-cache-
+
+      - name: Prepare build dependencies and cross tools via Zig script
+        shell: bash
+        working-directory: workspace/script-zig
+        run: |
+          set -euo pipefail
+          zig build run -- ci:prepare-tools \
+            --cargo-tools-root "${CARGO_TOOLS_ROOT}" \
+            --tauri-version "~2.10"
+
+      - name: Build release artifacts
+        id: build_release
+        shell: bash
+        working-directory: workspace/script-zig
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          set -euo pipefail
+          rm -rf "$OUTPUT_DIR"
+          mkdir -p "$OUTPUT_DIR"
+          build_log="$(mktemp)"
+          assert_log="$(mktemp)"
+          trap 'rm -f "$build_log" "$assert_log"' EXIT
+
+          annotate_errors() {
+            awk '
+              {
+                print
+                clean=$0
+                gsub(/\x1B\[[0-9;]*[[:alpha:]]/, "", clean)
+                if (clean ~ /\[ERROR\]|build-all failures|target failed|command failed \(|Package .* failed|failed for|error:/) {
+                  print "::error::" clean
+                }
+              }
+            '
+          }
+
+          collect_failure_digest() {
+            awk '
+              {
+                clean=$0
+                gsub(/\x1B\[[0-9;]*[[:alpha:]]/, "", clean)
+                if (clean ~ /\[ERROR\]|fatal error:|error: could not compile|unsupported target|failed to find tool|unable to find dynamic system library|russh requires enabling either ring or aws-lc-rs|command failed \(|Package .* failed/) {
+                  if (!(clean in seen)) {
+                    seen[clean] = 1
+                    print clean
+                    count++
+                    if (count >= 120) {
+                      exit
+                    }
+                  }
+                }
+              }
+            ' "$@"
+          }
+
+          set +e
+          zig build run -- release:build-all "${{ steps.meta.outputs.resolved_mode }}" --output-dir "$OUTPUT_DIR" 2>&1 | tee "$build_log" | annotate_errors
+          build_exit=${PIPESTATUS[0]}
+          if [ "$build_exit" -eq 0 ]; then
+            zig build run -- ci:assert-artifacts --output-dir "$OUTPUT_DIR" 2>&1 | tee "$assert_log" | annotate_errors
+            assert_exit=${PIPESTATUS[0]}
+          else
+            echo "skip ci:assert-artifacts because build failed"
+            assert_exit=1
+          fi
+          set -e
+
+          failure_digest=""
+          if [ "$build_exit" -ne 0 ] || [ "$assert_exit" -ne 0 ]; then
+            failure_digest="$(collect_failure_digest "$build_log" "$assert_log" | sed '/^[[:space:]]*$/d' || true)"
+            if [ -z "$failure_digest" ]; then
+              failure_digest="No digest lines matched. Check full logs in this step."
+            fi
+            echo "::group::Failure digest"
+            printf '%s\n' "$failure_digest"
+            echo "::endgroup::"
+            while IFS= read -r line; do
+              [ -z "$line" ] && continue
+              echo "::error::$line"
+            done <<< "$failure_digest"
+          fi
+
+          if [ "$build_exit" -eq 0 ] && [ "$assert_exit" -eq 0 ]; then
+            echo "status=success" >> "$GITHUB_OUTPUT"
+            echo "exit_code=0" >> "$GITHUB_OUTPUT"
+            {
+              echo "failure_digest<<EOF"
+              echo ""
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "status=failed" >> "$GITHUB_OUTPUT"
+            if [ "$build_exit" -ne 0 ]; then
+              echo "exit_code=$build_exit" >> "$GITHUB_OUTPUT"
+            else
+              echo "exit_code=$assert_exit" >> "$GITHUB_OUTPUT"
+            fi
+            {
+              echo "failure_digest<<EOF"
+              printf '%s\n' "$failure_digest"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate CLI and GUI build report
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          {
+            echo "## CLI / GUI Build Result"
+            echo ""
+            echo "- Mode: \`${{ steps.meta.outputs.resolved_mode }}\`"
+            echo "- Build status: \`${{ steps.build_release.outputs.status }}\`"
+            echo "- Exit code: \`${{ steps.build_release.outputs.exit_code }}\`"
+            echo ""
+            echo "Detailed build errors are printed inline in step \`Build release artifacts\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload workflow artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-all-${{ steps.meta.outputs.release_tag }}
+          path: |
+            /tmp/FileUniRelease/*
+
+      - name: Publish GitHub Release in community repo via Zig script
+        if: steps.build_release.outputs.status == 'success'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        working-directory: workspace/script-zig
+        run: |
+          set -euo pipefail
+          zig build run -- ci:publish-community-release \
+            --repo "${GITHUB_REPOSITORY}" \
+            --release-tag "${{ steps.meta.outputs.release_tag }}" \
+            --workspace-ref "${{ steps.meta.outputs.resolved_ref }}" \
+            --build-mode "${{ steps.meta.outputs.resolved_mode }}" \
+            --trigger-source "${{ steps.meta.outputs.trigger_source }}" \
+            --prerelease "${{ steps.meta.outputs.resolved_prerelease }}" \
+            --output-dir "${OUTPUT_DIR}" \
+            --token-env "GITHUB_TOKEN"
+
+      - name: Add workflow summary via Zig script
+        if: always()
+        shell: bash
+        working-directory: workspace/script-zig
+        run: |
+          set -euo pipefail
+          zig build run -- ci:write-release-summary \
+            --release-tag "${{ steps.meta.outputs.release_tag }}" \
+            --workspace-ref "${{ steps.meta.outputs.resolved_ref }}" \
+            --build-mode "${{ steps.meta.outputs.resolved_mode }}" \
+            --prerelease "${{ steps.meta.outputs.resolved_prerelease }}" \
+            --trigger-source "${{ steps.meta.outputs.trigger_source }}"
+
+      - name: Fail workflow when build failed
+        if: always() && steps.build_release.outputs.status != 'success'
+        shell: bash
+        env:
+          FAILURE_DIGEST: ${{ steps.build_release.outputs.failure_digest }}
+        run: |
+          set -euo pipefail
+          digest="${FAILURE_DIGEST:-}"
+          if [ -n "$digest" ]; then
+            echo "::group::Failure digest from build step"
+            printf '%s\n' "$digest"
+            echo "::endgroup::"
+          fi
+          echo "::error::Build failed in mode '${{ steps.meta.outputs.resolved_mode }}'. See inline error annotations in step 'Build release artifacts'."
+          exit 1
