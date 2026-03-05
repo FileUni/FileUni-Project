@@ -306,9 +306,11 @@ jobs:
       - name: Fail workflow when build failed
         if: always() && steps.build_release.outputs.status != 'success'
         shell: bash
+        env:
+          FAILURE_DIGEST: ${{ steps.build_release.outputs.failure_digest }}
         run: |
           set -euo pipefail
-          digest="${{ steps.build_release.outputs.failure_digest }}"
+          digest="${FAILURE_DIGEST:-}"
           if [ -n "$digest" ]; then
             echo "::group::Failure digest from build step"
             printf '%s\n' "$digest"
