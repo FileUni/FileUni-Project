@@ -1,43 +1,12 @@
-# FileUni Release Responsibility (Community Side)
+# FileUni 两仓库 CI 逻辑（Community 侧）
 
-This repository (`fileuni/FileUni-Community`) is the **public release repository**.
+- `FileUni-Community` 是公开构建与发布仓库。
+- 它接收来自 `FileUni-WorkSpace` 的 dispatch 触发。
+- 收到触发后，Community CI 拉取 WorkSpace 指定代码并执行构建。
+- 构建完成后，在 Community 仓库发布 GitHub Release 和下载产物。
 
-## Responsibility
+## 发布顺序
 
-- Provide public Issues entry.
-- Build release artifacts by pulling source from `fileuni/FileUni-WorkSpace`.
-- Publish GitHub Releases and downloadable binaries.
-
-## Build Workflow
-
-Workflow: `.github/workflows/community-build-release.yml`
-
-Trigger:
-
-- `workflow_dispatch` (usually dispatched by `FileUni-WorkSpace` workflow)
-
-Inputs:
-
-- `release_tag` (required)
-- `workspace_ref` (optional)
-- `build_mode` (optional)
-- `prerelease` (optional)
-- `trigger_source` (optional)
-
-## Required Secret
-
-- `FILEUNI_WORKSPACE_PAT`
-  - Must be able to read private repository `fileuni/FileUni-WorkSpace`
-
-## Optional Variables
-
-- `BUILD_MODE` (fallback build mode)
-- `WORKSPACE_DEFAULT_REF` (fallback source branch, default `main`)
-
-## End-to-End Sequence
-
-1. `FileUni-WorkSpace` dispatches this workflow with release metadata.
-2. This workflow resolves source ref and build mode.
-3. It checks out private `FileUni-WorkSpace` source.
-4. It executes `go run script/tools.go release:build-all ...`.
-5. It uploads artifacts and publishes release assets in this public repository.
+1. 接收 `FileUni-WorkSpace` 触发请求。
+2. 拉取 `FileUni-WorkSpace` 指定版本源码并构建。
+3. 上传 artifacts 并在 `FileUni-Community` 发布 Release。
