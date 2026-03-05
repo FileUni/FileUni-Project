@@ -40,120 +40,15 @@ jobs:
       DEFAULT_WORKSPACE_REF: main
       CARGO_TOOLS_ROOT: /home/runner/.cargo-tools
     steps:
-      - name: Validate required secret
-        env:
-          FILEUNI_WORKSPACE_PAT: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [ -z "$FILEUNI_WORKSPACE_PAT" ]; then
-            echo "::error::Missing required secret FILEUNI_WORKSPACE_PAT"
-            echo "::error::This token must be able to read fileuni/FileUni-WorkSpace"
-            exit 1
-          fi
-
-      - name: Resolve release inputs
-        id: meta
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          release_tag="${{ inputs.release_tag }}"
-          workspace_ref="${{ inputs.workspace_ref }}"
-          resolved_mode="${{ inputs.build_mode }}"
-          manual_prerelease="${{ inputs.prerelease }}"
-          trigger_source="${{ inputs.trigger_source }}"
-          resolved_prerelease="false"
-
-          if [ -z "$release_tag" ]; then
-            echo "::error::release_tag must not be empty"
-            exit 1
-          fi
-
-          if [ -z "$workspace_ref" ]; then
-            workspace_ref="$release_tag"
-          fi
-
-          if [ -z "$resolved_mode" ]; then
-            resolved_mode="${{ vars.BUILD_MODE }}"
-          fi
-
-          if [ -z "$resolved_mode" ]; then
-            resolved_mode="minimal"
-          fi
-
-          if [ "$manual_prerelease" = "true" ]; then
-            resolved_prerelease="true"
-          fi
-
-          normalized_tag="$(printf '%s' "$release_tag" | tr '[:upper:]' '[:lower:]')"
-          if [[ "$normalized_tag" == *"test"* || "$normalized_tag" == *"beta"* || "$normalized_tag" == *"rc"* || "$normalized_tag" == *"dev"* || "$normalized_tag" == *"alpha"* || "$normalized_tag" == *"pre"* ]]; then
-            resolved_prerelease="true"
-          fi
-
-          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
-          echo "workspace_ref=$workspace_ref" >> "$GITHUB_OUTPUT"
-          echo "resolved_mode=$resolved_mode" >> "$GITHUB_OUTPUT"
-          echo "resolved_prerelease=$resolved_prerelease" >> "$GITHUB_OUTPUT"
-          echo "trigger_source=$trigger_source" >> "$GITHUB_OUTPUT"
-
-      - name: Resolve workspace source ref
-        id: source_ref
-        env:
-          FILEUNI_WORKSPACE_PAT: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          ref_candidate="${{ steps.meta.outputs.workspace_ref }}"
-          fallback_ref="${{ vars.WORKSPACE_DEFAULT_REF }}"
-          if [ -z "$fallback_ref" ]; then
-            fallback_ref="$DEFAULT_WORKSPACE_REF"
-          fi
-
-          auth_repo_url="https://x-access-token:${FILEUNI_WORKSPACE_PAT}@github.com/${WORKSPACE_REPO}.git"
-
-          has_tag() {
-            local ref_name="$1"
-            git ls-remote --exit-code --tags "$auth_repo_url" "refs/tags/${ref_name}" > /dev/null 2>&1
-          }
-
-          has_branch() {
-            local ref_name="$1"
-            git ls-remote --exit-code --heads "$auth_repo_url" "refs/heads/${ref_name}" > /dev/null 2>&1
-          }
-
-          resolved_ref=""
-          if [[ "$ref_candidate" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
-            resolved_ref="$ref_candidate"
-          elif has_tag "$ref_candidate"; then
-            resolved_ref="$ref_candidate"
-          elif has_branch "$ref_candidate"; then
-            resolved_ref="$ref_candidate"
-          elif has_branch "$fallback_ref"; then
-            echo "::warning::Source ref '${ref_candidate}' was not found. Falling back to '${fallback_ref}'."
-            resolved_ref="$fallback_ref"
-          else
-            echo "::error::Source ref '${ref_candidate}' and fallback '${fallback_ref}' are both unavailable."
-            exit 1
-          fi
-
-          echo "resolved_ref=$resolved_ref" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout private workspace source
+      - name: Checkout private workspace source (bootstrap)
         uses: actions/checkout@v4
         with:
           repository: ${{ env.WORKSPACE_REPO }}
-          ref: ${{ steps.source_ref.outputs.resolved_ref }}
+          ref: ${{ vars.WORKSPACE_DEFAULT_REF || env.DEFAULT_WORKSPACE_REF }}
           token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
           path: workspace
           fetch-depth: 0
-          submodules: recursive
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
+          submodules: false
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -161,6 +56,38 @@ jobs:
           go-version: "1.25.x"
           cache: true
           cache-dependency-path: workspace/script/go.sum
+
+      - name: Resolve release metadata and source ref via Go script
+        id: meta
+        env:
+          FILEUNI_WORKSPACE_PAT: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run workspace/script/tools.go ci:resolve-community-build \
+            --release-tag "${{ inputs.release_tag }}" \
+            --workspace-ref "${{ inputs.workspace_ref }}" \
+            --build-mode "${{ inputs.build_mode }}" \
+            --build-mode-var "${{ vars.BUILD_MODE }}" \
+            --prerelease "${{ inputs.prerelease }}" \
+            --trigger-source "${{ inputs.trigger_source }}" \
+            --workspace-repo "${WORKSPACE_REPO}" \
+            --workspace-token-env "FILEUNI_WORKSPACE_PAT" \
+            --fallback-ref "${{ vars.WORKSPACE_DEFAULT_REF }}" \
+            --default-fallback-ref "${DEFAULT_WORKSPACE_REF}"
+
+      - name: Checkout resolved workspace source ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          go run workspace/script/tools.go ci:checkout-workspace-ref \
+            --repo-path workspace \
+            --ref "${{ steps.meta.outputs.resolved_ref }}"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -174,19 +101,18 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /home/runner/.cargo-tools
-          key: ${{ runner.os }}-cargo-tools-v1-tauri2_10
+          key: ${{ runner.os }}-cargo-tools-v2-tauri2_10
           restore-keys: |
-            ${{ runner.os }}-cargo-tools-v1-
+            ${{ runner.os }}-cargo-tools-v2-
+            ${{ runner.os }}-cargo-tools-
 
-      - name: Cache default cargo bin tools
+      - name: Cache cargo-binstall metadata
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.cargo/bin/cargo-*
-            ~/.cargo/bin/tauri*
-          key: ${{ runner.os }}-cargo-bin-tools-v1
+          path: ~/.cache/cargo-binstall
+          key: ${{ runner.os }}-cargo-binstall-v1
           restore-keys: |
-            ${{ runner.os }}-cargo-bin-tools-
+            ${{ runner.os }}-cargo-binstall-
 
       - name: Add cargo tools to PATH
         shell: bash
@@ -221,32 +147,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bun-cache-
 
-      - name: Prepare build dependencies
+      - name: Prepare build dependencies and cross tools via Go script
         shell: bash
-        working-directory: workspace
         run: |
           set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential pkg-config libssl-dev ruby ruby-dev rpm libarchive-tools \
-            squashfs-tools bubblewrap fakeroot \
-            libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
-          sudo apt-get install -y upx-ucl || sudo apt-get install -y upx
-          sudo gem install --no-document fpm
-
-          if ! command -v cargo-zigbuild > /dev/null 2>&1; then
-            cargo install cargo-zigbuild --root "$CARGO_TOOLS_ROOT" --locked
-          fi
-
-          if ! command -v cargo-xwin > /dev/null 2>&1; then
-            cargo install cargo-xwin --root "$CARGO_TOOLS_ROOT" --locked
-          fi
-
-          if ! command -v cargo-tauri > /dev/null 2>&1; then
-            cargo install tauri-cli --version '~2.10' --root "$CARGO_TOOLS_ROOT" --locked
-          fi
-
-          cargo tauri --version
+          go run workspace/script/tools.go ci:prepare-tools \
+            --cargo-tools-root "${CARGO_TOOLS_ROOT}" \
+            --tauri-version "~2.10"
 
       - name: Build release artifacts
         shell: bash
@@ -257,16 +164,7 @@ jobs:
           mkdir -p "$OUTPUT_DIR"
 
           go run script/tools.go release:build-all "${{ steps.meta.outputs.resolved_mode }}" --output-dir "$OUTPUT_DIR"
-
-          if [ ! -d "$OUTPUT_DIR" ]; then
-            echo "::error::Expected artifact directory not found: $OUTPUT_DIR"
-            exit 1
-          fi
-
-          if ! compgen -G "$OUTPUT_DIR/*" > /dev/null; then
-            echo "::error::No artifacts found in: $OUTPUT_DIR"
-            exit 1
-          fi
+          go run script/tools.go ci:assert-artifacts --output-dir "$OUTPUT_DIR"
 
       - name: Upload workflow artifacts
         uses: actions/upload-artifact@v4
@@ -274,54 +172,29 @@ jobs:
           name: release-all-${{ steps.meta.outputs.release_tag }}
           path: /tmp/FileUniRelease/*
 
-      - name: Publish GitHub Release in community repo
+      - name: Publish GitHub Release in community repo via Go script
         env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
-          WORKSPACE_REF: ${{ steps.source_ref.outputs.resolved_ref }}
-          BUILD_MODE: ${{ steps.meta.outputs.resolved_mode }}
-          RESOLVED_PRERELEASE: ${{ steps.meta.outputs.resolved_prerelease }}
-          TRIGGER_SOURCE: ${{ steps.meta.outputs.trigger_source }}
+          GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
+          go run workspace/script/tools.go ci:publish-community-release \
+            --repo "${GITHUB_REPOSITORY}" \
+            --release-tag "${{ steps.meta.outputs.release_tag }}" \
+            --workspace-ref "${{ steps.meta.outputs.resolved_ref }}" \
+            --build-mode "${{ steps.meta.outputs.resolved_mode }}" \
+            --trigger-source "${{ steps.meta.outputs.trigger_source }}" \
+            --prerelease "${{ steps.meta.outputs.resolved_prerelease }}" \
+            --output-dir "${OUTPUT_DIR}" \
+            --token-env "GITHUB_TOKEN"
 
-          prerelease_flag=""
-          if [ "$RESOLVED_PRERELEASE" = "true" ]; then
-            prerelease_flag="--prerelease"
-          fi
-
-          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            notes="Automated release build from ${WORKSPACE_REF} (mode: ${BUILD_MODE}, source: ${TRIGGER_SOURCE})"
-            gh release create "$RELEASE_TAG" \
-              --repo "$GITHUB_REPOSITORY" \
-              --title "$RELEASE_TAG" \
-              --notes "$notes" \
-              $prerelease_flag
-          fi
-
-          release_id="$(gh api "/repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.id')"
-          current_prerelease="$(gh api "/repos/${GITHUB_REPOSITORY}/releases/${release_id}" --jq '.prerelease')"
-          if [ "$current_prerelease" != "$RESOLVED_PRERELEASE" ]; then
-            gh api --method PATCH \
-              "/repos/${GITHUB_REPOSITORY}/releases/${release_id}" \
-              -F prerelease="$RESOLVED_PRERELEASE" > /dev/null
-            echo "Updated prerelease status for ${RELEASE_TAG}: ${current_prerelease} -> ${RESOLVED_PRERELEASE}"
-          fi
-
-          gh release upload "$RELEASE_TAG" \
-            "$OUTPUT_DIR"/* \
-            --repo "$GITHUB_REPOSITORY" \
-            --clobber
-
-      - name: Add workflow summary
+      - name: Add workflow summary via Go script
         shell: bash
         run: |
-          {
-            echo "## FileUni Community Release"
-            echo "- Release tag: \`${{ steps.meta.outputs.release_tag }}\`"
-            echo "- Workspace source ref: \`${{ steps.source_ref.outputs.resolved_ref }}\`"
-            echo "- Build mode: \`${{ steps.meta.outputs.resolved_mode }}\`"
-            echo "- Pre-release: \`${{ steps.meta.outputs.resolved_prerelease }}\`"
-            echo "- Trigger source: \`${{ steps.meta.outputs.trigger_source }}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
+          set -euo pipefail
+          go run workspace/script/tools.go ci:write-release-summary \
+            --release-tag "${{ steps.meta.outputs.release_tag }}" \
+            --workspace-ref "${{ steps.meta.outputs.resolved_ref }}" \
+            --build-mode "${{ steps.meta.outputs.resolved_mode }}" \
+            --prerelease "${{ steps.meta.outputs.resolved_prerelease }}" \
+            --trigger-source "${{ steps.meta.outputs.trigger_source }}"
