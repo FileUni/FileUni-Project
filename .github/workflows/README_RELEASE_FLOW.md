@@ -1,12 +1,12 @@
-# FileUni 两仓库 CI 逻辑（Community 侧）
+# FileUni Two-Repo CI Logic (Community Side)
 
-- `FileUni-Community` 是公开构建与发布仓库。
-- 它接收来自 `FileUni-WorkSpace` 的 dispatch 触发。
-- 收到触发后，Community CI 拉取 WorkSpace 指定代码并执行构建。
-- 构建完成后，在 Community 仓库发布 GitHub Release 和下载产物。
+- `FileUni-Community` is the public build and release repository.
+- It receives dispatch triggers from `FileUni-WorkSpace`.
+- After trigger, Community CI pulls the specified source from WorkSpace and builds artifacts.
+- Community publishes GitHub Releases and downloadable assets.
 
-## 发布顺序
+## Release Sequence
 
-1. 接收 `FileUni-WorkSpace` 触发请求。
-2. 拉取 `FileUni-WorkSpace` 指定版本源码并构建。
-3. 上传 artifacts 并在 `FileUni-Community` 发布 Release。
+1. Receive trigger from `FileUni-WorkSpace`.
+2. Pull the specified WorkSpace ref and run the build.
+3. Upload artifacts and publish release in `FileUni-Community`.
