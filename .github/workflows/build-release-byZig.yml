@@ -175,8 +175,13 @@ jobs:
       FILEUNI_SKIP_FRONTEND_BUILD: "1"
       FILEUNI_ENABLE_SCCACHE: "1"
       CARGO_TOOLS_ROOT: ${{ matrix.cargo_tools_root }}
-      OUTPUT_DIR: ${{ runner.temp }}/FileUniRelease
     steps:
+      - name: Resolve runner output directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "OUTPUT_DIR=${RUNNER_TEMP}/FileUniRelease" >> "$GITHUB_ENV"
+
       - name: Checkout resolved workspace source ref
         uses: actions/checkout@v4
         with:
