@@ -81,8 +81,47 @@ jobs:
             --fallback-ref "${{ vars.WORKSPACE_DEFAULT_REF }}" \
             --default-fallback-ref "${DEFAULT_WORKSPACE_REF}"
 
-  build:
+  build-frontend:
     needs: resolve-meta
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout resolved workspace source ref
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.resolve-meta.outputs.resolved_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          fetch-depth: 0
+          submodules: true
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Build shared frontends once
+        shell: bash
+        working-directory: workspace
+        run: |
+          set -euo pipefail
+          bun install --cwd frontends/cli
+          bun run --cwd frontends/cli build
+          bun install --cwd frontends/gui
+          bun run --cwd frontends/gui build
+          test -d frontends/cli/dist
+          test -d frontends/gui/dist
+
+      - name: Upload frontend dist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist-${{ needs.resolve-meta.outputs.release_tag }}
+          path: |
+            workspace/frontends/cli/dist
+            workspace/frontends/gui/dist
+
+  build:
+    needs: [resolve-meta, build-frontend]
     strategy:
       fail-fast: true
       max-parallel: 2
@@ -111,6 +150,7 @@ jobs:
       FILEUNI_TARGET_INCLUDE_GLOB: ${{ matrix.target_include_glob }}
       FILEUNI_TARGET_EXCLUDE_GLOB: ${{ matrix.target_exclude_glob }}
       FILEUNI_ENABLE_DARWIN_CROSS: "1"
+      FILEUNI_SKIP_FRONTEND_BUILD: "1"
       CARGO_TOOLS_ROOT: ${{ matrix.cargo_tools_root }}
     steps:
       - name: Checkout resolved workspace source ref
@@ -186,6 +226,12 @@ jobs:
           key: ${{ runner.os }}-bun-cache-${{ hashFiles('workspace/**/bun.lock', 'workspace/**/bun.lockb') }}
           restore-keys: |
             ${{ runner.os }}-bun-cache-
+
+      - name: Download prebuilt frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist-${{ needs.resolve-meta.outputs.release_tag }}
+          path: workspace/frontends
 
       - name: Prepare build dependencies and cross tools via Zig script
         shell: bash
