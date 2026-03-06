@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag in FileUni-Community (for example: v1.2.3)"
+        description: "Release label to publish in FileUni-Community (e.g., v1.2.3); source code comes from `workspace_ref` or defaults to main"
         required: true
         default: "v0.0.1-alpha.1"
       workspace_ref:
