@@ -260,6 +260,15 @@ jobs:
           fetch-depth: 0
           submodules: true
 
+      - name: Validate target filter (dry-run)
+        shell: bash
+        working-directory: workspace
+        env:
+          FILEUNI_DRY_RUN: "1"
+        run: |
+          set -euo pipefail
+          script-new-zig/scripts/release-build-all.sh "${{ needs.resolve-meta.outputs.resolved_mode }}" --output-dir "${RUNNER_TEMP}/fileuni-filter-check-linux-windows"
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -388,6 +397,15 @@ jobs:
           fetch-depth: 0
           submodules: true
 
+      - name: Validate target filter (dry-run)
+        shell: bash
+        working-directory: workspace
+        env:
+          FILEUNI_DRY_RUN: "1"
+        run: |
+          set -euo pipefail
+          script-new-zig/scripts/release-build-all.sh "${{ needs.resolve-meta.outputs.resolved_mode }}" --output-dir "${RUNNER_TEMP}/fileuni-filter-check-apple"
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
@@ -462,6 +480,15 @@ jobs:
           path: workspace
           fetch-depth: 0
           submodules: true
+
+      - name: Validate target filter (dry-run)
+        shell: bash
+        working-directory: workspace
+        env:
+          FILEUNI_DRY_RUN: "1"
+        run: |
+          set -euo pipefail
+          script-new-zig/scripts/release-build-all.sh "${{ needs.resolve-meta.outputs.resolved_mode }}" --output-dir "${RUNNER_TEMP}/fileuni-filter-check-android"
 
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
