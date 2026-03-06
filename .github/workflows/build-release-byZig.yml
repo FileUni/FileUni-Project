@@ -131,7 +131,11 @@ jobs:
             runs_on: ubuntu-latest
             cargo_tools_root: /home/runner/.cargo-tools
             target_include_glob: ""
-            target_exclude_glob: "*-apple-darwin"
+            target_exclude_glob: ""
+            cli_target_include_glob: ""
+            cli_target_exclude_glob: "*-apple-darwin,*-pc-windows-msvc"
+            gui_target_include_glob: "x86_64-unknown-linux-gnu,aarch64-unknown-linux-gnu"
+            gui_target_exclude_glob: "*-apple-darwin,*-pc-windows-msvc,*-linux-android"
             skip_system_deps: "false"
             skip_fpm: "false"
             appimage_extract_and_run: "1"
@@ -140,6 +144,22 @@ jobs:
             cargo_tools_root: /Users/runner/.cargo-tools
             target_include_glob: "*-apple-darwin"
             target_exclude_glob: ""
+            cli_target_include_glob: "*-apple-darwin"
+            cli_target_exclude_glob: ""
+            gui_target_include_glob: "*-apple-darwin"
+            gui_target_exclude_glob: ""
+            skip_system_deps: "true"
+            skip_fpm: "true"
+            appimage_extract_and_run: "0"
+          - job_name: windows
+            runs_on: windows-latest
+            cargo_tools_root: C:/Users/runneradmin/.cargo-tools
+            target_include_glob: "*-pc-windows-msvc"
+            target_exclude_glob: ""
+            cli_target_include_glob: "*-pc-windows-msvc"
+            cli_target_exclude_glob: ""
+            gui_target_include_glob: "*-pc-windows-msvc"
+            gui_target_exclude_glob: ""
             skip_system_deps: "true"
             skip_fpm: "true"
             appimage_extract_and_run: "0"
@@ -147,10 +167,15 @@ jobs:
     env:
       FILEUNI_TARGET_INCLUDE_GLOB: ${{ matrix.target_include_glob }}
       FILEUNI_TARGET_EXCLUDE_GLOB: ${{ matrix.target_exclude_glob }}
+      FILEUNI_CLI_TARGET_INCLUDE_GLOB: ${{ matrix.cli_target_include_glob }}
+      FILEUNI_CLI_TARGET_EXCLUDE_GLOB: ${{ matrix.cli_target_exclude_glob }}
+      FILEUNI_GUI_TARGET_INCLUDE_GLOB: ${{ matrix.gui_target_include_glob }}
+      FILEUNI_GUI_TARGET_EXCLUDE_GLOB: ${{ matrix.gui_target_exclude_glob }}
       FILEUNI_ENABLE_DARWIN_CROSS: "1"
       FILEUNI_SKIP_FRONTEND_BUILD: "1"
       FILEUNI_ENABLE_SCCACHE: "1"
       CARGO_TOOLS_ROOT: ${{ matrix.cargo_tools_root }}
+      OUTPUT_DIR: ${{ runner.temp }}/FileUniRelease
     steps:
       - name: Checkout resolved workspace source ref
         uses: actions/checkout@v4
@@ -169,6 +194,10 @@ jobs:
         uses: mlugg/setup-zig@v2
         with:
           version: "0.15.2"
+
+      - name: Setup MSVC environment
+        if: matrix.job_name == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Cache cargo installed tools
         uses: actions/cache@v4
@@ -413,7 +442,7 @@ jobs:
         with:
           name: release-${{ matrix.job_name }}-${{ needs.resolve-meta.outputs.release_tag }}
           path: |
-            /tmp/FileUniRelease/*
+            ${{ env.OUTPUT_DIR }}/*
 
   publish:
     needs: [resolve-meta, build]
