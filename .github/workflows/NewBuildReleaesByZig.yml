@@ -214,6 +214,17 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/cli/node_modules
+            workspace/frontends/gui/node_modules
+          key: ${{ runner.os }}-new-zig-bun-${{ hashFiles('workspace/frontends/cli/bun.lock', 'workspace/frontends/gui/bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-new-zig-bun-
+
       - name: Build shared frontends once
         shell: bash
         working-directory: workspace
@@ -234,8 +245,95 @@ jobs:
             workspace/frontends/cli/dist
             workspace/frontends/gui/dist
 
-  build-linux-windows:
+  preflight-release-smoke:
     needs: [resolve-meta, build-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workspace source
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.resolve-meta.outputs.resolved_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          fetch-depth: 0
+          submodules: true
+
+      - name: Setup Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: "0.15.2"
+
+      - name: Download prebuilt frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist-${{ needs.resolve-meta.outputs.release_tag }}
+          path: workspace
+
+      - name: Normalize frontend dist layout
+        shell: bash
+        working-directory: workspace
+        run: |
+          set -euo pipefail
+
+          ensure_dist() {
+            expected="$1"
+            shift
+            if [ -f "${expected}/index.html" ]; then
+              return 0
+            fi
+            for candidate in "$@"; do
+              if [ -f "${candidate}/index.html" ]; then
+                rm -rf "${expected}"
+                mkdir -p "$(dirname "${expected}")"
+                cp -a "${candidate}" "${expected}"
+                return 0
+              fi
+            done
+            echo "::error::missing frontend dist: ${expected}/index.html"
+            return 1
+          }
+
+          ensure_dist "frontends/cli/dist" "frontends/cli/dist" "workspace/frontends/cli/dist" "cli/dist"
+          ensure_dist "frontends/gui/dist" "frontends/gui/dist" "workspace/frontends/gui/dist" "gui/dist"
+
+      - name: Preflight dry-run (linux/windows profile)
+        shell: bash
+        working-directory: workspace
+        env:
+          FILEUNI_DRY_RUN: "1"
+          FILEUNI_APPS: ${{ needs.resolve-meta.outputs.linux_windows_apps }}
+          FILEUNI_TARGET_INCLUDE_GLOB: ${{ needs.resolve-meta.outputs.linux_windows_include_glob }}
+        run: |
+          set -euo pipefail
+          script-new-zig/scripts/release-build-all.sh "${{ needs.resolve-meta.outputs.resolved_mode }}" --output-dir "${RUNNER_TEMP}/preflight-linux-windows"
+
+      - name: Preflight dry-run (apple profile)
+        if: needs.resolve-meta.outputs.has_apple_target == 'true'
+        shell: bash
+        working-directory: workspace
+        env:
+          FILEUNI_DRY_RUN: "1"
+          FILEUNI_APPS: ${{ needs.resolve-meta.outputs.apple_apps }}
+          FILEUNI_TARGET_INCLUDE_GLOB: ${{ needs.resolve-meta.outputs.apple_include_glob }}
+        run: |
+          set -euo pipefail
+          script-new-zig/scripts/release-build-all.sh "${{ needs.resolve-meta.outputs.resolved_mode }}" --output-dir "${RUNNER_TEMP}/preflight-apple"
+
+      - name: Preflight dry-run (android profile)
+        if: needs.resolve-meta.outputs.has_android_target == 'true'
+        shell: bash
+        working-directory: workspace
+        env:
+          FILEUNI_DRY_RUN: "1"
+          FILEUNI_APPS: ${{ needs.resolve-meta.outputs.android_apps }}
+          FILEUNI_TARGET_INCLUDE_GLOB: ${{ needs.resolve-meta.outputs.android_include_glob }}
+        run: |
+          set -euo pipefail
+          script-new-zig/scripts/release-build-all.sh "${{ needs.resolve-meta.outputs.resolved_mode }}" --output-dir "${RUNNER_TEMP}/preflight-android"
+
+  build-linux-windows:
+    needs: [resolve-meta, build-frontend, preflight-release-smoke]
     runs-on: ubuntu-latest
     env:
       FILEUNI_APPS: ${{ needs.resolve-meta.outputs.linux_windows_apps }}
@@ -243,6 +341,7 @@ jobs:
       FILEUNI_SKIP_FRONTEND_BUILD: "1"
       FILEUNI_ENABLE_SCCACHE: "1"
       CARGO_TOOLS_ROOT: ${{ github.workspace }}/.cargo-tools
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
     steps:
       - name: Resolve runner output directory
         shell: bash
@@ -302,6 +401,24 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-new-zig-cargo-registry-
 
+      - name: Cache Zig build cache
+        uses: actions/cache@v4
+        with:
+          path: workspace/.zig-cache
+          key: ${{ runner.os }}-new-zig-zig-cache-linux-windows-${{ hashFiles('workspace/script-new-zig/**') }}
+          restore-keys: |
+            ${{ runner.os }}-new-zig-zig-cache-linux-windows-
+            ${{ runner.os }}-new-zig-zig-cache-
+
+      - name: Cache sccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: ${{ runner.os }}-new-zig-sccache-linux-windows-${{ needs.resolve-meta.outputs.resolved_mode }}-${{ hashFiles('workspace/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-new-zig-sccache-linux-windows-${{ needs.resolve-meta.outputs.resolved_mode }}-
+            ${{ runner.os }}-new-zig-sccache-
+
       - name: Cache Rust target directory
         uses: actions/cache@v4
         with:
@@ -347,13 +464,20 @@ jobs:
       - name: Prepare build dependencies and cross tools
         shell: bash
         working-directory: workspace
+        env:
+          FILEUNI_GITHUB_TOKEN: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
         run: |
           set -euo pipefail
           zig build release-run -- ci:prepare-tools \
             --cargo-tools-root "${CARGO_TOOLS_ROOT}" \
             --tauri-version "~2.10" \
-            --skip-system-deps="false" \
-            --skip-fpm="false"
+            --skip-system-deps "false" \
+            --skip-fpm "false" \
+            --install-zigbuild "true" \
+            --install-xwin "true" \
+            --install-tauri "true" \
+            --install-sccache "true" \
+            --github-token "${FILEUNI_GITHUB_TOKEN}"
 
       - name: Build release artifacts (linux/windows/bsd)
         shell: bash
@@ -373,13 +497,15 @@ jobs:
 
   build-apple:
     if: needs.resolve-meta.outputs.has_apple_target == 'true'
-    needs: [resolve-meta, build-frontend]
+    needs: [resolve-meta, build-frontend, preflight-release-smoke]
     runs-on: macos-14
     env:
       FILEUNI_APPS: ${{ needs.resolve-meta.outputs.apple_apps }}
       FILEUNI_TARGET_INCLUDE_GLOB: ${{ needs.resolve-meta.outputs.apple_include_glob }}
       FILEUNI_SKIP_FRONTEND_BUILD: "1"
+      FILEUNI_ENABLE_SCCACHE: "1"
       CARGO_TOOLS_ROOT: ${{ github.workspace }}/.cargo-tools
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
     steps:
       - name: Resolve runner output directory
         shell: bash
@@ -414,6 +540,15 @@ jobs:
         with:
           version: "0.15.2"
 
+      - name: Cache cargo installed tools
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.cargo-tools
+          key: ${{ runner.os }}-new-zig-cargo-tools-v2-tauri2_10
+          restore-keys: |
+            ${{ runner.os }}-new-zig-cargo-tools-v2-
+            ${{ runner.os }}-new-zig-cargo-tools-
+
       - name: Add cargo tools to PATH
         shell: bash
         run: |
@@ -421,23 +556,94 @@ jobs:
           mkdir -p "${CARGO_TOOLS_ROOT}/bin"
           echo "${CARGO_TOOLS_ROOT}/bin" >> "$GITHUB_PATH"
 
+      - name: Cache Cargo registry and git index
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-new-zig-cargo-registry-${{ hashFiles('workspace/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-new-zig-cargo-registry-
+
+      - name: Cache Rust target directory
+        uses: actions/cache@v4
+        with:
+          path: workspace/target
+          key: ${{ runner.os }}-new-zig-cargo-target-apple-${{ needs.resolve-meta.outputs.resolved_mode }}-${{ hashFiles('workspace/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-new-zig-cargo-target-apple-${{ needs.resolve-meta.outputs.resolved_mode }}-
+            ${{ runner.os }}-new-zig-cargo-target-apple-
+
+      - name: Cache Zig build cache
+        uses: actions/cache@v4
+        with:
+          path: workspace/.zig-cache
+          key: ${{ runner.os }}-new-zig-zig-cache-apple-${{ hashFiles('workspace/script-new-zig/**') }}
+          restore-keys: |
+            ${{ runner.os }}-new-zig-zig-cache-apple-
+            ${{ runner.os }}-new-zig-zig-cache-
+
+      - name: Cache sccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: ${{ runner.os }}-new-zig-sccache-apple-${{ needs.resolve-meta.outputs.resolved_mode }}-${{ hashFiles('workspace/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-new-zig-sccache-apple-${{ needs.resolve-meta.outputs.resolved_mode }}-
+            ${{ runner.os }}-new-zig-sccache-apple-
+
       - name: Download prebuilt frontend dist
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist-${{ needs.resolve-meta.outputs.release_tag }}
           path: workspace
 
+      - name: Normalize frontend dist layout
+        shell: bash
+        working-directory: workspace
+        run: |
+          set -euo pipefail
+
+          ensure_dist() {
+            expected="$1"
+            shift
+            if [ -f "${expected}/index.html" ]; then
+              return 0
+            fi
+            for candidate in "$@"; do
+              if [ -f "${candidate}/index.html" ]; then
+                rm -rf "${expected}"
+                mkdir -p "$(dirname "${expected}")"
+                cp -a "${candidate}" "${expected}"
+                return 0
+              fi
+            done
+            echo "::error::missing frontend dist: ${expected}/index.html"
+            return 1
+          }
+
+          ensure_dist "frontends/cli/dist" "frontends/cli/dist" "workspace/frontends/cli/dist" "cli/dist"
+          ensure_dist "frontends/gui/dist" "frontends/gui/dist" "workspace/frontends/gui/dist" "gui/dist"
+
       - name: Prepare Apple build tools
         shell: bash
         working-directory: workspace
+        env:
+          FILEUNI_GITHUB_TOKEN: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
         run: |
           set -euo pipefail
           xcodebuild -version
           zig build release-run -- ci:prepare-tools \
             --cargo-tools-root "${CARGO_TOOLS_ROOT}" \
             --tauri-version "~2.10" \
-            --skip-system-deps="true" \
-            --skip-fpm="true"
+            --skip-system-deps "true" \
+            --skip-fpm "true" \
+            --install-zigbuild "false" \
+            --install-xwin "false" \
+            --install-tauri "true" \
+            --install-sccache "false" \
+            --github-token "${FILEUNI_GITHUB_TOKEN}"
 
       - name: Build release artifacts (apple)
         shell: bash
@@ -457,13 +663,15 @@ jobs:
 
   build-android:
     if: needs.resolve-meta.outputs.has_android_target == 'true'
-    needs: [resolve-meta, build-frontend]
+    needs: [resolve-meta, build-frontend, preflight-release-smoke]
     runs-on: ubuntu-latest
     env:
       FILEUNI_APPS: ${{ needs.resolve-meta.outputs.android_apps }}
       FILEUNI_TARGET_INCLUDE_GLOB: ${{ needs.resolve-meta.outputs.android_include_glob }}
       FILEUNI_SKIP_FRONTEND_BUILD: "1"
+      FILEUNI_ENABLE_SCCACHE: "1"
       CARGO_TOOLS_ROOT: ${{ github.workspace }}/.cargo-tools
+      SCCACHE_DIR: ${{ github.workspace }}/.sccache
     steps:
       - name: Resolve runner output directory
         shell: bash
@@ -498,6 +706,52 @@ jobs:
         with:
           version: "0.15.2"
 
+      - name: Cache cargo installed tools
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.cargo-tools
+          key: ${{ runner.os }}-new-zig-cargo-tools-v2-tauri2_10
+          restore-keys: |
+            ${{ runner.os }}-new-zig-cargo-tools-v2-
+            ${{ runner.os }}-new-zig-cargo-tools-
+
+      - name: Cache Cargo registry and git index
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-new-zig-cargo-registry-${{ hashFiles('workspace/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-new-zig-cargo-registry-
+
+      - name: Cache Rust target directory
+        uses: actions/cache@v4
+        with:
+          path: workspace/target
+          key: ${{ runner.os }}-new-zig-cargo-target-android-${{ needs.resolve-meta.outputs.resolved_mode }}-${{ hashFiles('workspace/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-new-zig-cargo-target-android-${{ needs.resolve-meta.outputs.resolved_mode }}-
+            ${{ runner.os }}-new-zig-cargo-target-android-
+
+      - name: Cache Zig build cache
+        uses: actions/cache@v4
+        with:
+          path: workspace/.zig-cache
+          key: ${{ runner.os }}-new-zig-zig-cache-android-${{ hashFiles('workspace/script-new-zig/**') }}
+          restore-keys: |
+            ${{ runner.os }}-new-zig-zig-cache-android-
+            ${{ runner.os }}-new-zig-zig-cache-
+
+      - name: Cache sccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.SCCACHE_DIR }}
+          key: ${{ runner.os }}-new-zig-sccache-android-${{ needs.resolve-meta.outputs.resolved_mode }}-${{ hashFiles('workspace/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-new-zig-sccache-android-${{ needs.resolve-meta.outputs.resolved_mode }}-
+            ${{ runner.os }}-new-zig-sccache-android-
+
       - name: Setup Java for Android
         uses: actions/setup-java@v4
         with:
@@ -524,7 +778,9 @@ jobs:
           export ANDROID_SDK_ROOT="${sdk_root}"
           export ANDROID_HOME="${sdk_root}"
           yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+          sdkmanager --install "platform-tools" "platforms;android-34" "build-tools;34.0.0" "ndk;27.0.12077973"
+          echo "ANDROID_NDK_HOME=${sdk_root}/ndk/27.0.12077973" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=${sdk_root}/ndk/27.0.12077973" >> "$GITHUB_ENV"
           rustup target add aarch64-linux-android
 
       - name: Add cargo tools to PATH
@@ -540,16 +796,50 @@ jobs:
           name: frontend-dist-${{ needs.resolve-meta.outputs.release_tag }}
           path: workspace
 
+      - name: Normalize frontend dist layout
+        shell: bash
+        working-directory: workspace
+        run: |
+          set -euo pipefail
+
+          ensure_dist() {
+            expected="$1"
+            shift
+            if [ -f "${expected}/index.html" ]; then
+              return 0
+            fi
+            for candidate in "$@"; do
+              if [ -f "${candidate}/index.html" ]; then
+                rm -rf "${expected}"
+                mkdir -p "$(dirname "${expected}")"
+                cp -a "${candidate}" "${expected}"
+                return 0
+              fi
+            done
+            echo "::error::missing frontend dist: ${expected}/index.html"
+            return 1
+          }
+
+          ensure_dist "frontends/cli/dist" "frontends/cli/dist" "workspace/frontends/cli/dist" "cli/dist"
+          ensure_dist "frontends/gui/dist" "frontends/gui/dist" "workspace/frontends/gui/dist" "gui/dist"
+
       - name: Prepare Android build tools
         shell: bash
         working-directory: workspace
+        env:
+          FILEUNI_GITHUB_TOKEN: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
         run: |
           set -euo pipefail
           zig build release-run -- ci:prepare-tools \
             --cargo-tools-root "${CARGO_TOOLS_ROOT}" \
             --tauri-version "~2.10" \
-            --skip-system-deps="true" \
-            --skip-fpm="true"
+            --skip-system-deps "true" \
+            --skip-fpm "true" \
+            --install-zigbuild "false" \
+            --install-xwin "false" \
+            --install-tauri "true" \
+            --install-sccache "true" \
+            --github-token "${FILEUNI_GITHUB_TOKEN}"
 
       - name: Build release artifacts (android)
         shell: bash
