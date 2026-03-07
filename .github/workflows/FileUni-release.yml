@@ -1366,6 +1366,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          xcode_dev_dir="$(xcode-select -p)"
+          default_toolchain="${xcode_dev_dir}/Toolchains/XcodeDefault.xctoolchain"
           tauri_target="${{ matrix.target }}"
           case "${{ matrix.target }}" in
             aarch64-apple-ios) tauri_target="aarch64" ;;
@@ -1386,6 +1388,8 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
+            TOOLCHAINS="com.apple.dt.toolchain.XcodeDefault" \
+            TOOLCHAIN_DIR="${default_toolchain}" \
             cargo tauri ios build --ci --target "${tauri_target}" --config tauri.ios.conf.json --no-sign | tee /tmp/xcodebuild-ios.log
           else
             APPLE_CERTIFICATE="" \
@@ -1396,6 +1400,8 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
+            TOOLCHAINS="com.apple.dt.toolchain.XcodeDefault" \
+            TOOLCHAIN_DIR="${default_toolchain}" \
             cargo tauri ios build --ci --target "${tauri_target}" --config tauri.ios.conf.json | tee /tmp/xcodebuild-ios.log
           fi
 
