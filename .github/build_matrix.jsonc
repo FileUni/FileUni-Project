@@ -1,0 +1,41 @@
+{
+  // FileUni Build Matrix Configuration
+  // Controls which platforms are built for each mode and product.
+  //
+  // mode: "minimal" = fast dev/test builds, "full" = all platforms
+  // build_method: "cargo-dist" | "cross" | "vmactions"
+  // nfpm_arch: set for Linux targets that should produce deb/rpm/apk/archlinux/ipk packages (empty string = skip)
+  // upx: whether UPX compression is supported for this target
+
+  "cli": {
+    "cargo-dist": [
+      { "runner": "ubuntu-latest",  "target": "x86_64-unknown-linux-gnu",      "nfpm_arch": "amd64",   "upx": false, "mode": ["full"] },
+      { "runner": "ubuntu-latest",  "target": "x86_64-unknown-linux-musl",     "nfpm_arch": "amd64",   "upx": false, "mode": ["minimal", "full"] },
+      { "runner": "ubuntu-latest",  "target": "aarch64-unknown-linux-gnu",     "nfpm_arch": "arm64",   "upx": false, "mode": ["full"] },
+      { "runner": "windows-latest", "target": "x86_64-pc-windows-msvc",        "nfpm_arch": "",        "upx": false, "mode": ["full"] },
+      { "runner": "windows-latest", "target": "i686-pc-windows-msvc",          "nfpm_arch": "",        "upx": false, "mode": ["full"] },
+      { "runner": "macos-15",       "target": "x86_64-apple-darwin",           "nfpm_arch": "",        "upx": false, "mode": ["full"] },
+      { "runner": "macos-15",       "target": "aarch64-apple-darwin",          "nfpm_arch": "",        "upx": false, "mode": ["full"] }
+    ],
+    "cross": [
+      { "target": "aarch64-unknown-linux-musl",    "nfpm_arch": "arm64",   "upx": true,  "mode": ["full"] },
+      { "target": "armv7-unknown-linux-musleabihf", "nfpm_arch": "armhf",   "upx": true,  "mode": ["full"] },
+      { "target": "arm-unknown-linux-gnueabi",      "nfpm_arch": "armel",   "upx": false, "mode": ["full"] },
+      { "target": "riscv64gc-unknown-linux-gnu",    "nfpm_arch": "riscv64", "upx": false, "mode": ["full"] },
+      { "target": "powerpc64le-unknown-linux-gnu",  "nfpm_arch": "ppc64le", "upx": false, "mode": ["full"] },
+      { "target": "aarch64-linux-android",          "nfpm_arch": "",        "upx": false, "mode": ["full"] },
+      { "target": "armv7-linux-androideabi",        "nfpm_arch": "",        "upx": false, "mode": ["full"] },
+      { "target": "x86_64-linux-android",           "nfpm_arch": "",        "upx": false, "mode": ["full"] }
+    ],
+    "vmactions": [
+      { "os": "freebsd", "release": "14.2", "target": "x86_64-unknown-freebsd", "mode": ["full"] }
+    ]
+  },
+
+  // GUI targets (Tauri) — not yet implemented, placeholder for future use
+  "gui": {
+    "cargo-dist": [],
+    "cross": [],
+    "vmactions": []
+  }
+}

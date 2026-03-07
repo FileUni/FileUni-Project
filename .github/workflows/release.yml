@@ -7,6 +7,14 @@ on:
         description: "Source ref in FileUni-WorkSpace (tag/branch/sha). Default: main"
         required: false
         default: "main"
+      build_mode:
+        description: "Build mode: full (all platforms) or minimal (x64 linux only)"
+        type: choice
+        options:
+          - full
+          - minimal
+        required: false
+        default: "full"
       prerelease:
         description: "Mark as pre-release"
         type: boolean
@@ -30,13 +38,21 @@ env:
   CARGO_DIST_VERSION: "0.28.0"
 
 jobs:
-  build-frontends:
+  resolve-matrix:
     runs-on: ubuntu-latest
     outputs:
       workspace_ref: ${{ steps.meta.outputs.workspace_ref }}
       release_tag: ${{ steps.meta.outputs.release_tag }}
       dist_tag: ${{ steps.meta.outputs.dist_tag }}
       pkg_version: ${{ steps.meta.outputs.pkg_version }}
+      cli_cargo_dist: ${{ steps.matrix.outputs.cli_cargo_dist }}
+      cli_cross: ${{ steps.matrix.outputs.cli_cross }}
+      cli_vmactions: ${{ steps.matrix.outputs.cli_vmactions }}
+      cli_nfpm: ${{ steps.matrix.outputs.cli_nfpm }}
+      has_cargo_dist: ${{ steps.matrix.outputs.has_cargo_dist }}
+      has_cross: ${{ steps.matrix.outputs.has_cross }}
+      has_vmactions: ${{ steps.matrix.outputs.has_vmactions }}
+      has_nfpm: ${{ steps.matrix.outputs.has_nfpm }}
     steps:
       - name: Resolve workspace ref
         id: resolve-ref
@@ -54,6 +70,11 @@ jobs:
           submodules: true
           fetch-depth: 0
           fetch-tags: true
+
+      - name: Checkout community repo
+        uses: actions/checkout@v4
+        with:
+          path: community
 
       - name: Resolve release metadata
         id: meta
@@ -73,6 +94,54 @@ jobs:
           fi
           echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
           echo "::notice::dist_tag=v${pkg_version}  release_tag=${release_tag}  ref=${ref}"
+
+      - name: Resolve build matrix
+        id: matrix
+        run: |
+          mode="${{ github.event.inputs.build_mode }}"
+          mode="${mode:-full}"
+
+          # Strip JSONC comments and parse
+          sed 's|//.*||' community/.github/build_matrix.jsonc | jq -c '.' > /tmp/matrix.json
+
+          # Filter targets by mode for each build method
+          cli_cargo_dist="$(jq -c --arg m "$mode" '[.cli["cargo-dist"][] | select(.mode | index($m))]' /tmp/matrix.json)"
+          cli_cross="$(jq -c --arg m "$mode" '[.cli.cross[] | select(.mode | index($m))]' /tmp/matrix.json)"
+          cli_vmactions="$(jq -c --arg m "$mode" '[.cli.vmactions[] | select(.mode | index($m))]' /tmp/matrix.json)"
+
+          # nFPM targets: all Linux targets with non-empty nfpm_arch from both cargo-dist and cross
+          cli_nfpm="$(jq -c --arg m "$mode" '
+            [
+              (.cli["cargo-dist"][] | select(.mode | index($m)) | select(.nfpm_arch != "") | {target, nfpm_arch, artifact: ("cli-" + .target)}),
+              (.cli.cross[]        | select(.mode | index($m)) | select(.nfpm_arch != "") | {target, nfpm_arch, artifact: ("cli-" + .target)})
+            ]
+          ' /tmp/matrix.json)"
+
+          echo "cli_cargo_dist=${cli_cargo_dist}" >> "$GITHUB_OUTPUT"
+          echo "cli_cross=${cli_cross}" >> "$GITHUB_OUTPUT"
+          echo "cli_vmactions=${cli_vmactions}" >> "$GITHUB_OUTPUT"
+          echo "cli_nfpm=${cli_nfpm}" >> "$GITHUB_OUTPUT"
+
+          # has_* flags for conditional job execution
+          echo "has_cargo_dist=$([ "$(echo "$cli_cargo_dist" | jq 'length')" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_cross=$([ "$(echo "$cli_cross" | jq 'length')" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_vmactions=$([ "$(echo "$cli_vmactions" | jq 'length')" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_nfpm=$([ "$(echo "$cli_nfpm" | jq 'length')" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+          echo "::notice::mode=${mode} cargo_dist=$(echo "$cli_cargo_dist" | jq 'length') cross=$(echo "$cli_cross" | jq 'length') vmactions=$(echo "$cli_vmactions" | jq 'length') nfpm=$(echo "$cli_nfpm" | jq 'length')"
+
+  build-frontends:
+    needs: resolve-matrix
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -105,28 +174,19 @@ jobs:
   # Tier 1/2: cargo-dist native builds
   # ============================================================
   build-cli:
-    needs: build-frontends
+    needs: [resolve-matrix, build-frontends]
+    if: needs.resolve-matrix.outputs.has_cargo_dist == 'true'
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # --- Linux ---
-          - { runner: ubuntu-latest,  target: x86_64-unknown-linux-gnu }
-          - { runner: ubuntu-latest,  target: x86_64-unknown-linux-musl }
-          - { runner: ubuntu-latest,  target: aarch64-unknown-linux-gnu }
-          # --- Windows ---
-          - { runner: windows-latest, target: x86_64-pc-windows-msvc }
-          - { runner: windows-latest, target: i686-pc-windows-msvc }
-          # --- macOS ---
-          - { runner: macos-15,       target: x86_64-apple-darwin }
-          - { runner: macos-15,       target: aarch64-apple-darwin }
+        include: ${{ fromJSON(needs.resolve-matrix.outputs.cli_cargo_dist) }}
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout workspace
         uses: actions/checkout@v4
         with:
           repository: ${{ env.WORKSPACE_REPO }}
-          ref: ${{ needs.build-frontends.outputs.workspace_ref }}
+          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
           token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
           path: workspace
           submodules: true
@@ -175,7 +235,7 @@ jobs:
 
       - name: Build via cargo-dist
         working-directory: workspace
-        run: dist build --tag="${{ needs.build-frontends.outputs.dist_tag }}" --target "${{ matrix.target }}" --artifacts=local
+        run: dist build --tag="${{ needs.resolve-matrix.outputs.dist_tag }}" --target "${{ matrix.target }}" --artifacts=local
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -187,30 +247,19 @@ jobs:
   # Cross-compiled builds (Linux exotic + Android)
   # ============================================================
   build-cli-cross:
-    needs: build-frontends
+    needs: [resolve-matrix, build-frontends]
+    if: needs.resolve-matrix.outputs.has_cross == 'true'
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # --- Linux ARM ---
-          - { target: aarch64-unknown-linux-musl,    nfpm_arch: arm64,   upx: true  }
-          - { target: armv7-unknown-linux-musleabihf, nfpm_arch: armhf,   upx: true  }
-          - { target: arm-unknown-linux-gnueabi,     nfpm_arch: armel,   upx: false }
-          # --- Linux RISC-V ---
-          - { target: riscv64gc-unknown-linux-gnu,   nfpm_arch: riscv64, upx: false }
-          # --- Linux PowerPC ---
-          - { target: powerpc64le-unknown-linux-gnu, nfpm_arch: ppc64le, upx: false }
-          # --- Android ---
-          - { target: aarch64-linux-android,         nfpm_arch: "",      upx: false }
-          - { target: armv7-linux-androideabi,       nfpm_arch: "",      upx: false }
-          - { target: x86_64-linux-android,          nfpm_arch: "",      upx: false }
+        include: ${{ fromJSON(needs.resolve-matrix.outputs.cli_cross) }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout workspace
         uses: actions/checkout@v4
         with:
           repository: ${{ env.WORKSPACE_REPO }}
-          ref: ${{ needs.build-frontends.outputs.workspace_ref }}
+          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
           token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
           path: workspace
           submodules: true
@@ -291,19 +340,19 @@ jobs:
   # BSD builds via vmactions (FreeBSD native VM)
   # ============================================================
   build-cli-bsd:
-    needs: build-frontends
+    needs: [resolve-matrix, build-frontends]
+    if: needs.resolve-matrix.outputs.has_vmactions == 'true'
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - { os: freebsd, release: "14.2", target: x86_64-unknown-freebsd }
+        include: ${{ fromJSON(needs.resolve-matrix.outputs.cli_vmactions) }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout workspace
         uses: actions/checkout@v4
         with:
           repository: ${{ env.WORKSPACE_REPO }}
-          ref: ${{ needs.build-frontends.outputs.workspace_ref }}
+          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
           token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
           path: workspace
           submodules: true
@@ -315,6 +364,7 @@ jobs:
           path: workspace/frontends/cli/dist
 
       - name: Build on FreeBSD
+        if: matrix.os == 'freebsd'
         uses: vmactions/freebsd-vm@v1
         with:
           release: ${{ matrix.release }}
@@ -347,25 +397,15 @@ jobs:
 
   # ============================================================
   # Linux packaging via nFPM (deb/rpm/apk/archlinux/ipk)
-  # Runs after all Linux builds complete, packages each arch.
   # ============================================================
   package-linux:
-    needs: [build-frontends, build-cli, build-cli-cross]
+    needs: [resolve-matrix, build-cli, build-cli-cross]
+    if: ${{ always() && !cancelled() && needs.resolve-matrix.outputs.has_nfpm == 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # --- from build-cli ---
-          - { target: x86_64-unknown-linux-gnu,      nfpm_arch: amd64,   artifact: cli-x86_64-unknown-linux-gnu }
-          - { target: x86_64-unknown-linux-musl,     nfpm_arch: amd64,   artifact: cli-x86_64-unknown-linux-musl }
-          - { target: aarch64-unknown-linux-gnu,     nfpm_arch: arm64,   artifact: cli-aarch64-unknown-linux-gnu }
-          # --- from build-cli-cross ---
-          - { target: aarch64-unknown-linux-musl,    nfpm_arch: arm64,   artifact: cli-aarch64-unknown-linux-musl }
-          - { target: armv7-unknown-linux-musleabihf, nfpm_arch: armhf,   artifact: cli-armv7-unknown-linux-musleabihf }
-          - { target: arm-unknown-linux-gnueabi,     nfpm_arch: armel,   artifact: cli-arm-unknown-linux-gnueabi }
-          - { target: riscv64gc-unknown-linux-gnu,   nfpm_arch: riscv64, artifact: cli-riscv64gc-unknown-linux-gnu }
-          - { target: powerpc64le-unknown-linux-gnu, nfpm_arch: ppc64le, artifact: cli-powerpc64le-unknown-linux-gnu }
+        include: ${{ fromJSON(needs.resolve-matrix.outputs.cli_nfpm) }}
     steps:
       - name: Download binary artifact
         uses: actions/download-artifact@v4
@@ -408,7 +448,7 @@ jobs:
       - name: Build packages
         env:
           NFPM_ARCH: ${{ matrix.nfpm_arch }}
-          VERSION: ${{ needs.build-frontends.outputs.pkg_version }}
+          VERSION: ${{ needs.resolve-matrix.outputs.pkg_version }}
         run: |
           mkdir -p packages
           target="${{ matrix.target }}"
@@ -426,7 +466,7 @@ jobs:
           path: packages/*
 
   publish:
-    needs: [build-frontends, build-cli, build-cli-cross, build-cli-bsd, package-linux]
+    needs: [resolve-matrix, build-cli, build-cli-cross, build-cli-bsd, package-linux]
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-latest
     steps:
@@ -451,12 +491,12 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ needs.build-frontends.outputs.release_tag }}
-          name: ${{ needs.build-frontends.outputs.release_tag }}
+          tag_name: ${{ needs.resolve-matrix.outputs.release_tag }}
+          name: ${{ needs.resolve-matrix.outputs.release_tag }}
           prerelease: ${{ github.event.inputs.prerelease == 'true' }}
           fail_on_unmatched_files: false
           files: /tmp/release/*
           body: |
-            ## FileUni ${{ needs.build-frontends.outputs.release_tag }}
+            ## FileUni ${{ needs.resolve-matrix.outputs.release_tag }}
 
-            Built from [`${{ needs.build-frontends.outputs.workspace_ref }}`](https://github.com/${{ env.WORKSPACE_REPO }}/tree/${{ needs.build-frontends.outputs.workspace_ref }})
+            Built from [`${{ needs.resolve-matrix.outputs.workspace_ref }}`](https://github.com/${{ env.WORKSPACE_REPO }}/tree/${{ needs.resolve-matrix.outputs.workspace_ref }})
