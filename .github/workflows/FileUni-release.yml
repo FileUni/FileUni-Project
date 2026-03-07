@@ -1397,13 +1397,10 @@ jobs:
           copyback: true
           mem: 8192
           prepare: |
-            pkg install -y rust curl zip upx
+            pkg install -y rust curl zip
           run: |
             cd workspace
             cargo build --release --package fileuni
-            if [ "${{ github.event.inputs.enable_upx }}" != "false" ]; then
-              upx --best --lzma target/release/fileuni -o target/release/fileuni-upx
-            fi
             ls -la target/release/fileuni
 
       - name: Package binary
@@ -1427,7 +1424,7 @@ jobs:
           tar -cJf "dist/${base}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
 
       - name: Package UPX binary
-        if: github.event.inputs.enable_upx != 'false'
+        if: github.event.inputs.enable_upx != 'false' && !contains(matrix.target, 'freebsd')
         run: |
           target="${{ matrix.target }}"
           arch_raw="${target%%-*}"
@@ -1447,7 +1444,7 @@ jobs:
           zip -j "dist-upx/${base}.upx.zip" "${upx_bin}"
 
       - name: Upload UPX artifacts
-        if: github.event.inputs.enable_upx != 'false'
+        if: github.event.inputs.enable_upx != 'false' && !contains(matrix.target, 'freebsd')
         uses: actions/upload-artifact@v4
         with:
           name: cli-${{ matrix.target }}-upx

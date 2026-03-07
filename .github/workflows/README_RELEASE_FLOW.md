@@ -2,7 +2,7 @@
 
 ## Workflow
 
-- File: `release.yml`
+- File: `FileUni-release.yml`
 - Trigger: `workflow_dispatch` (manual or API-dispatch from WorkSpace)
 - Required secret: `FILEUNI_WORKSPACE_PAT`
 
