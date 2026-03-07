@@ -129,14 +129,40 @@ jobs:
             tauri ios init --ci
           fi
 
+          # Force generated Xcode project to unsigned mode.
+          project_pbxproj="gen/apple/fileuni-gui.xcodeproj/project.pbxproj"
+          if [ -f "${project_pbxproj}" ]; then
+            python3 - <<'PY'
+            import re
+            from pathlib import Path
+
+            p = Path("gen/apple/fileuni-gui.xcodeproj/project.pbxproj")
+            s = p.read_text()
+            s = re.sub(r'DEVELOPMENT_TEAM = [^;]*;', 'DEVELOPMENT_TEAM = "";', s)
+            s = re.sub(r'CODE_SIGN_STYLE = [^;]*;', 'CODE_SIGN_STYLE = Manual;', s)
+            s = re.sub(r'CODE_SIGN_IDENTITY = [^;]*;', 'CODE_SIGN_IDENTITY = "";', s)
+            s = re.sub(r'PROVISIONING_PROFILE_SPECIFIER = [^;]*;', 'PROVISIONING_PROFILE_SPECIFIER = "";', s)
+            s = re.sub(r'PROVISIONING_PROFILE = [^;]*;', 'PROVISIONING_PROFILE = "";', s)
+            p.write_text(s)
+            PY
+          fi
+
           # Use Tauri iOS build entrypoint so internal server-addr lifecycle is correctly managed.
           if tauri ios build --help | grep -q -- '--no-sign'; then
+            APPLE_CERTIFICATE="" \
+            APPLE_CERTIFICATE_PASSWORD="" \
+            APPLE_SIGNING_IDENTITY="" \
+            APPLE_TEAM_ID="" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
             tauri ios build --ci --target aarch64 --config tauri.ios.conf.json --no-sign | tee /tmp/xcodebuild-ios.log
           else
+            APPLE_CERTIFICATE="" \
+            APPLE_CERTIFICATE_PASSWORD="" \
+            APPLE_SIGNING_IDENTITY="" \
+            APPLE_TEAM_ID="" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
