@@ -4,8 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag (e.g. v0.1.1-alpha.4.2)"
-        required: true
+        description: "Release tag (e.g. v0.1.1-alpha.4.2). Empty = auto from Cargo.toml"
+        required: false
+        default: ""
       workspace_ref:
         description: "Source ref in FileUni-WorkSpace (branch/tag/sha)"
         required: false
@@ -32,6 +33,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       workspace_ref: ${{ steps.ref.outputs.ref }}
+      release_tag: ${{ steps.meta.outputs.release_tag }}
+      dist_tag: ${{ steps.meta.outputs.dist_tag }}
     steps:
       - name: Resolve workspace ref
         id: ref
@@ -47,6 +50,20 @@ jobs:
           token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
           path: workspace
           submodules: true
+
+      - name: Resolve release metadata
+        id: meta
+        working-directory: workspace
+        run: |
+          pkg_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fileuni") | .version')"
+          dist_tag="v${pkg_version}"
+
+          input_tag="${{ github.event.inputs.release_tag }}"
+          release_tag="${input_tag:-${dist_tag}}"
+
+          echo "dist_tag=${dist_tag}" >> "$GITHUB_OUTPUT"
+          echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
+          echo "::notice::dist_tag=${dist_tag} release_tag=${release_tag}"
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -135,9 +152,7 @@ jobs:
 
       - name: Build via cargo-dist
         working-directory: workspace
-        run: |
-          pkg_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fileuni") | .version')"
-          dist build --tag="v${pkg_version}" --target "${{ matrix.target }}" --artifacts=local
+        run: dist build --tag="${{ needs.build-frontends.outputs.dist_tag }}" --target "${{ matrix.target }}" --artifacts=local
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -159,12 +174,12 @@ jobs:
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.inputs.release_tag }}
-          name: ${{ github.event.inputs.release_tag }}
+          tag_name: ${{ needs.build-frontends.outputs.release_tag }}
+          name: ${{ needs.build-frontends.outputs.release_tag }}
           prerelease: ${{ github.event.inputs.prerelease == 'true' }}
           files: /tmp/release/*
           body: |
-            ## FileUni ${{ github.event.inputs.release_tag }}
+            ## FileUni ${{ needs.build-frontends.outputs.release_tag }}
 
             Built from [`${{ needs.build-frontends.outputs.workspace_ref }}`](https://github.com/${{ env.WORKSPACE_REPO }}/tree/${{ needs.build-frontends.outputs.workspace_ref }})
 
@@ -172,8 +187,8 @@ jobs:
 
             ```bash
             # Linux/macOS
-            curl --proto '=https' --tlsv1.2 -LsSf https://github.com/FileUni/FileUni-Community/releases/download/${{ github.event.inputs.release_tag }}/fileuni-installer.sh | sh
+            curl --proto '=https' --tlsv1.2 -LsSf https://github.com/FileUni/FileUni-Community/releases/download/${{ needs.build-frontends.outputs.release_tag }}/fileuni-installer.sh | sh
 
             # Windows
-            powershell -ExecutionPolicy Bypass -c "irm https://github.com/FileUni/FileUni-Community/releases/download/${{ github.event.inputs.release_tag }}/fileuni-installer.ps1 | iex"
+            powershell -ExecutionPolicy Bypass -c "irm https://github.com/FileUni/FileUni-Community/releases/download/${{ needs.build-frontends.outputs.release_tag }}/fileuni-installer.ps1 | iex"
             ```
