@@ -1,4 +1,4 @@
-# FileUni-Project
+# FileUni-Community
 
 This repository is the public community hub for **FileUni**:
 - issue discussion and feedback,
