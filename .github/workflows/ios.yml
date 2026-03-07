@@ -1,0 +1,175 @@
+name: iOS Unsigned IPA
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace_ref:
+        description: "Source ref in FileUni-WorkSpace (tag/branch/sha). Default: main"
+        required: false
+        default: "main"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-unsigned-${{ github.run_id }}
+  cancel-in-progress: false
+
+env:
+  WORKSPACE_REPO: FileUni/FileUni-WorkSpace
+
+jobs:
+  build-ios-unsigned:
+    runs-on: macos-latest
+    steps:
+      - name: Resolve workspace ref
+        id: resolve-ref
+        shell: bash
+        run: |
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+            workspace/frontends/cli/node_modules
+            workspace/frontends/gui/node_modules
+            workspace/frontends/shared/node_modules
+          key: ios-bun-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: ios-bun-
+
+      - name: Build frontend assets (CLI + GUI)
+        working-directory: workspace/frontends
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun install
+          bun run --cwd cli build
+          bun run --cwd gui build
+          test -f cli/dist/index.html
+          test -f gui/dist/index.html
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: workspace
+          key: ios-aarch64-apple-ios
+
+      - name: Install cargo-tauri CLI (native arm64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if command -v cargo-tauri >/dev/null 2>&1; then
+            rm -f "$(command -v cargo-tauri)"
+          fi
+          cargo install tauri-cli --locked --version '^2' --force
+          which cargo-tauri
+          cargo-tauri -V
+          file "$(command -v cargo-tauri)"
+
+      - name: Initialize iOS project if missing
+        working-directory: workspace/apps/gui
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -d "gen/apple" ]; then
+            cargo tauri ios init --ci
+          fi
+
+      - name: Build iOS unsigned app with xcodebuild
+        working-directory: workspace/apps/gui
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ ! -d "gen/apple" ]; then
+            cargo tauri ios init --ci
+          fi
+
+          workspace_path="$(find gen/apple -type d -name '*.xcworkspace' | head -1 || true)"
+          if [ -z "${workspace_path}" ] || [ ! -d "${workspace_path}" ]; then
+            echo "::error::iOS xcworkspace not found under gen/apple"
+            exit 1
+          fi
+
+          derived_data="$(pwd)/gen/apple/build"
+          rm -rf "${derived_data}"
+
+          xcodebuild \
+            -workspace "${workspace_path}" \
+            -scheme fileuni-gui_iOS \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath "${derived_data}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build | tee /tmp/xcodebuild-ios.log
+
+      - name: Package unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          ipa="$(find workspace/apps/gui -type f -name '*.ipa' | head -1 || true)"
+          if [ -z "${ipa}" ] || [ ! -f "${ipa}" ]; then
+            app="$(find workspace/apps/gui/gen/apple/build -type d -name '*.app' | head -1 || true)"
+            if [ -z "${app}" ] || [ ! -d "${app}" ]; then
+              app="$(find workspace/apps/gui -type d -name '*.app' | head -1 || true)"
+            fi
+            if [ -z "${app}" ] || [ ! -d "${app}" ]; then
+              echo "::error::No .ipa or .app artifact found"
+              exit 1
+            fi
+            rm -rf /tmp/ios-payload
+            mkdir -p /tmp/ios-payload/Payload
+            cp -R "${app}" /tmp/ios-payload/Payload/
+            (cd /tmp/ios-payload && zip -r -q unsigned.ipa Payload)
+            ipa="/tmp/ios-payload/unsigned.ipa"
+          fi
+
+          mkdir -p dist
+          cp "${ipa}" "dist/FileUni-gui-aarch64-ios-darwin.ipa"
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-ios-aarch64-apple-ios
+          path: dist/*
+
+      - name: Upload build logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-logs
+          path: |
+            /tmp/xcodebuild-ios.log
+            workspace/apps/gui/gen/apple/build/**/Logs/**
+          if-no-files-found: ignore
