@@ -1,0 +1,177 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag (e.g. v0.1.1-alpha.4.2)"
+        required: true
+      workspace_ref:
+        description: "Source ref in FileUni-WorkSpace (branch/tag/sha)"
+        required: false
+        default: "main"
+      prerelease:
+        description: "Mark as pre-release"
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.inputs.release_tag || github.run_id }}
+  cancel-in-progress: false
+
+env:
+  WORKSPACE_REPO: FileUni/FileUni-WorkSpace
+  CARGO_DIST_VERSION: "0.28.0"
+
+jobs:
+  build-frontends:
+    runs-on: ubuntu-latest
+    outputs:
+      workspace_ref: ${{ steps.ref.outputs.ref }}
+    steps:
+      - name: Resolve workspace ref
+        id: ref
+        run: |
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+            workspace/frontends/cli/node_modules
+            workspace/frontends/shared/node_modules
+          key: bun-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: bun-
+
+      - name: Build frontends
+        working-directory: workspace/frontends
+        run: |
+          bun install
+          bun run --cwd cli build
+          test -f cli/dist/index.html
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: workspace/frontends/cli/dist
+
+  build-cli:
+    needs: build-frontends
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { runner: ubuntu-latest,  target: x86_64-unknown-linux-gnu }
+          - { runner: ubuntu-latest,  target: x86_64-unknown-linux-musl }
+          - { runner: ubuntu-latest,  target: aarch64-unknown-linux-gnu }
+          - { runner: windows-latest, target: x86_64-pc-windows-msvc }
+          - { runner: macos-15,       target: x86_64-apple-darwin }
+          - { runner: macos-15,       target: aarch64-apple-darwin }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.build-frontends.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: workspace/frontends/cli/dist
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cargo-dist
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-dist@${{ env.CARGO_DIST_VERSION }}
+
+      - name: Install musl-tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: Install aarch64 cross linker
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> "$GITHUB_ENV"
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: workspace
+          key: ${{ matrix.target }}
+
+      - name: Build via cargo-dist
+        working-directory: workspace
+        run: dist build --target "${{ matrix.target }}" --artifacts=local
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: workspace/target/distrib/*
+
+  publish:
+    needs: [build-frontends, build-cli]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all CLI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cli-*
+          path: /tmp/release
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          name: ${{ github.event.inputs.release_tag }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          files: /tmp/release/*
+          body: |
+            ## FileUni ${{ github.event.inputs.release_tag }}
+
+            Built from [`${{ needs.build-frontends.outputs.workspace_ref }}`](https://github.com/${{ env.WORKSPACE_REPO }}/tree/${{ needs.build-frontends.outputs.workspace_ref }})
+
+            ### Install
+
+            ```bash
+            # Linux/macOS
+            curl --proto '=https' --tlsv1.2 -LsSf https://github.com/FileUni/FileUni-Community/releases/download/${{ github.event.inputs.release_tag }}/fileuni-installer.sh | sh
+
+            # Windows
+            powershell -ExecutionPolicy Bypass -c "irm https://github.com/FileUni/FileUni-Community/releases/download/${{ github.event.inputs.release_tag }}/fileuni-installer.ps1 | iex"
+            ```
