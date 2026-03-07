@@ -89,11 +89,11 @@ jobs:
         run: |
           set -euo pipefail
           bun add -g @tauri-apps/cli@2
-          bunx --bun tauri -V
+          "${HOME}/.bun/bin/tauri" -V
           mkdir -p "${HOME}/.cargo/bin"
-          printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec bunx --bun tauri "$@"' > "${HOME}/.cargo/bin/cargo-tauri"
+          printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec "${HOME}/.bun/bin/tauri" "$@"' > "${HOME}/.cargo/bin/cargo-tauri"
           chmod +x "${HOME}/.cargo/bin/cargo-tauri"
-          printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec bunx --bun tauri "$@"' > "${HOME}/.cargo/bin/tauri"
+          printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec "${HOME}/.bun/bin/tauri" "$@"' > "${HOME}/.cargo/bin/tauri"
           chmod +x "${HOME}/.cargo/bin/tauri"
           cargo-tauri -V
           tauri -V
@@ -122,7 +122,6 @@ jobs:
           echo "PATH=${PATH}"
           command -v tauri
           command -v cargo-tauri
-          tauri -V
 
           workspace_path="$(find gen/apple -type d -name '*.xcworkspace' | head -1 || true)"
           if [ -z "${workspace_path}" ] || [ ! -d "${workspace_path}" ]; then
