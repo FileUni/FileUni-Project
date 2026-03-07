@@ -84,32 +84,12 @@ jobs:
           workspaces: workspace
           key: ios-aarch64-apple-ios
 
-      - name: Install cargo-tauri CLI
-        uses: taiki-e/install-action@v2
-        with:
-          tool: tauri-cli@2
-          fallback: cargo-binstall
-
-      - name: Verify cargo-tauri binary architecture
+      - name: Setup Tauri CLI (Bun)
         shell: bash
         run: |
           set -euo pipefail
-          which cargo-tauri
-          cargo-tauri -V
-          bin_info="$(file "$(command -v cargo-tauri)")"
-          echo "${bin_info}"
-          if echo "${bin_info}" | grep -q 'arm64'; then
-            exit 0
-          fi
-
-          echo "::warning::cargo-tauri is not arm64, switching to Bun/NPM arm64 Tauri CLI wrapper"
           bun add -g @tauri-apps/cli@2
-          mkdir -p "${HOME}/.cargo/bin"
-          printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec bunx --bun tauri "$@"' > "${HOME}/.cargo/bin/cargo-tauri"
-          chmod +x "${HOME}/.cargo/bin/cargo-tauri"
-
-          which cargo-tauri
-          cargo-tauri -V
+          bunx --bun tauri -V
 
       - name: Initialize iOS project if missing
         working-directory: workspace/apps/gui
@@ -117,39 +97,25 @@ jobs:
         run: |
           set -euo pipefail
           if [ ! -d "gen/apple" ]; then
-            cargo tauri ios init --ci
+            bunx --bun tauri ios init --ci
           fi
 
-      - name: Build iOS unsigned app with xcodebuild
+      - name: Build iOS unsigned app
         working-directory: workspace/apps/gui
         shell: bash
         run: |
           set -euo pipefail
 
           if [ ! -d "gen/apple" ]; then
-            cargo tauri ios init --ci
+            bunx --bun tauri ios init --ci
           fi
 
-          workspace_path="$(find gen/apple -type d -name '*.xcworkspace' | head -1 || true)"
-          if [ -z "${workspace_path}" ] || [ ! -d "${workspace_path}" ]; then
-            echo "::error::iOS xcworkspace not found under gen/apple"
-            exit 1
+          build_args=(ios build --ci --target aarch64)
+          if [ -f "tauri.ios.conf.json" ]; then
+            build_args+=(--config tauri.ios.conf.json)
           fi
 
-          derived_data="$(pwd)/gen/apple/build"
-          rm -rf "${derived_data}"
-
-          xcodebuild \
-            -workspace "${workspace_path}" \
-            -scheme fileuni-gui_iOS \
-            -sdk iphoneos \
-            -configuration Release \
-            -derivedDataPath "${derived_data}" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM="" \
-            build | tee /tmp/xcodebuild-ios.log
+          bunx --bun tauri "${build_args[@]}" | tee /tmp/xcodebuild-ios.log
 
       - name: Package unsigned IPA
         shell: bash
