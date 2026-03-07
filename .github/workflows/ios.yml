@@ -118,6 +118,20 @@ jobs:
             tauri ios init --ci
           fi
 
+          # Provide Node-resolvable tauri shim for Xcode scripts that call: node gen/apple/tauri ...
+          printf '%s\n' \
+            '#!/usr/bin/env node' \
+            "const { spawnSync } = require('node:child_process');" \
+            "const tauri = process.env.HOME + '/.cargo/bin/tauri';" \
+            "const result = spawnSync(tauri, process.argv.slice(2), { stdio: 'inherit' });" \
+            'if (result.error) {' \
+            '  console.error(result.error);' \
+            '  process.exit(1);' \
+            '}' \
+            'process.exit(result.status ?? 1);' \
+            > gen/apple/tauri
+          chmod +x gen/apple/tauri
+
       - name: Build iOS unsigned app
         working-directory: workspace/apps/gui
         shell: bash
@@ -129,6 +143,20 @@ jobs:
           if [ ! -d "gen/apple" ]; then
             tauri ios init --ci
           fi
+
+          # Provide Node-resolvable tauri shim for Xcode scripts that call: node gen/apple/tauri ...
+          printf '%s\n' \
+            '#!/usr/bin/env node' \
+            "const { spawnSync } = require('node:child_process');" \
+            "const tauri = process.env.HOME + '/.cargo/bin/tauri';" \
+            "const result = spawnSync(tauri, process.argv.slice(2), { stdio: 'inherit' });" \
+            'if (result.error) {' \
+            '  console.error(result.error);' \
+            '  process.exit(1);' \
+            '}' \
+            'process.exit(result.status ?? 1);' \
+            > gen/apple/tauri
+          chmod +x gen/apple/tauri
 
           echo "PATH=${PATH}"
           command -v tauri
@@ -151,57 +179,17 @@ jobs:
           derived_data="$(pwd)/gen/apple/build"
           rm -rf "${derived_data}"
 
-          run_xcodebuild() {
-            PATH="${PATH}" TAURI_CLI_PATH="${TAURI_CLI_PATH}" xcodebuild \
-              "${build_target_args[@]}" \
-              -scheme fileuni-gui_iOS \
-              -sdk iphoneos \
-              -configuration Release \
-              -derivedDataPath "${derived_data}" \
-              CODE_SIGNING_ALLOWED=NO \
-              CODE_SIGNING_REQUIRED=NO \
-              CODE_SIGN_IDENTITY="" \
-              DEVELOPMENT_TEAM="" \
-              build
-          }
-
-          set +e
-          run_xcodebuild 2>&1 | tee /tmp/xcodebuild-ios.log
-          build_status=${PIPESTATUS[0]}
-          set -e
-
-          if [ "${build_status}" -ne 0 ] && grep -q 'Script not found "tauri"' /tmp/xcodebuild-ios.log; then
-            echo "::warning::Detected missing tauri in Xcode Build Rust script, patching generated script and retrying once"
-            script_path="$(grep -oE '/[^ ]*Script-[^ ]+\.sh' /tmp/xcodebuild-ios.log | head -1 || true)"
-            if [ -z "${script_path}" ] || [ ! -f "${script_path}" ]; then
-              echo "::error::Failed to locate generated Xcode script for patching"
-              exit "${build_status}"
-            fi
-
-            python3 - "${script_path}" "${HOME}/.cargo/bin/tauri" <<'PY'
-            from pathlib import Path
-            import re
-            import sys
-
-            script_path = Path(sys.argv[1])
-            tauri_abs = sys.argv[2]
-            content = script_path.read_text()
-            patched = re.sub(r'(?<![\w/.-])tauri(?![\w/.-])', tauri_abs, content)
-            if patched != content:
-                script_path.write_text(patched)
-            PY
-
-            set +e
-            run_xcodebuild 2>&1 | tee /tmp/xcodebuild-ios-retry.log
-            retry_status=${PIPESTATUS[0]}
-            set -e
-
-            if [ "${retry_status}" -ne 0 ]; then
-              exit "${retry_status}"
-            fi
-          elif [ "${build_status}" -ne 0 ]; then
-            exit "${build_status}"
-          fi
+          PATH="${PATH}" TAURI_CLI_PATH="${TAURI_CLI_PATH}" xcodebuild \
+            "${build_target_args[@]}" \
+            -scheme fileuni-gui_iOS \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath "${derived_data}" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build | tee /tmp/xcodebuild-ios.log
 
       - name: Package unsigned IPA
         shell: bash
@@ -242,6 +230,5 @@ jobs:
             /tmp/frontend-cli-build.log
             /tmp/frontend-gui-build.log
             /tmp/xcodebuild-ios.log
-            /tmp/xcodebuild-ios-retry.log
             workspace/apps/gui/gen/apple/build/**/Logs/**
           if-no-files-found: ignore
