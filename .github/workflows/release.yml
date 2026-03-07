@@ -325,7 +325,7 @@ jobs:
           mkdir -p packages
           target="${{ matrix.target }}"
 
-          for fmt in deb rpm srpm apk archlinux ipk; do
+          for fmt in deb rpm apk archlinux ipk; do
             nfpm package --packager "${fmt}" --config nfpm.yaml --target "packages/" 2>&1 || echo "::warning::${fmt} packaging failed for ${target}"
           done
 
