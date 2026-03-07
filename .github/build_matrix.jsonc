@@ -1,0 +1,54 @@
+{
+  // FileUni Build Matrix Configuration
+  // Controls which platforms are built for each mode and product.
+  //
+  // mode: "minimal" = fast dev/test builds, "full" = all configured platforms
+  // build_method: "cargo-dist" | "cross" | "vmactions"
+  // nfpm_arch: set for Linux targets that should produce deb/rpm/apk/archlinux/ipk packages (empty string = skip)
+
+  "cli": {
+    "cargo-dist": [
+      { "runner": "ubuntu-latest",  "target": "x86_64-unknown-linux-gnu",      "nfpm_arch": "amd64",   "mode": ["full"] },
+      { "runner": "ubuntu-latest",  "target": "x86_64-unknown-linux-musl",     "nfpm_arch": "amd64",   "mode": ["minimal", "full"] },
+      { "runner": "ubuntu-latest",  "target": "aarch64-unknown-linux-gnu",     "nfpm_arch": "arm64",   "mode": ["full"] },
+      { "runner": "windows-latest", "target": "x86_64-pc-windows-msvc",        "nfpm_arch": "",        "mode": ["full"] },
+      { "runner": "windows-latest", "target": "i686-pc-windows-msvc",          "nfpm_arch": "",        "mode": ["full"] },
+      { "runner": "macos-15",       "target": "x86_64-apple-darwin",           "nfpm_arch": "",        "mode": ["full"] },
+      { "runner": "macos-15",       "target": "aarch64-apple-darwin",          "nfpm_arch": "",        "mode": ["full"] }
+    ],
+    "cross": [
+      { "target": "aarch64-unknown-linux-musl",    "nfpm_arch": "arm64",   "mode": ["full"] },
+      { "target": "armv7-unknown-linux-musleabihf", "nfpm_arch": "armhf",   "mode": ["full"] },
+      { "target": "arm-unknown-linux-gnueabi",      "nfpm_arch": "armel",   "mode": ["full"] },
+      { "target": "riscv64gc-unknown-linux-gnu",    "nfpm_arch": "riscv64", "mode": ["full"] },
+      { "target": "powerpc64le-unknown-linux-gnu",  "nfpm_arch": "ppc64le", "mode": ["full"] }
+    ],
+    "android": [
+      { "target": "aarch64-linux-android",   "ndk_abi": "arm64-v8a",    "mode": ["full"] },
+      { "target": "armv7-linux-androideabi", "ndk_abi": "armeabi-v7a",  "mode": ["full"] },
+      { "target": "x86_64-linux-android",    "ndk_abi": "x86_64",       "mode": ["full"] }
+    ],
+    "vmactions": [
+      { "os": "freebsd", "release": "14.2", "target": "x86_64-unknown-freebsd", "mode": ["full"] }
+    ]
+  },
+
+  // GUI targets (Tauri)
+  "gui": {
+    "tauri": [
+      { "runner": "windows-latest", "target": "x86_64-pc-windows-msvc",       "bundles": "",         "artifact_ext": ".exe",      "mode": ["full"] },
+      { "runner": "ubuntu-latest",  "target": "x86_64-unknown-linux-gnu",      "bundles": "appimage", "artifact_ext": ".AppImage", "mode": ["minimal", "full"] },
+      { "runner": "ubuntu-24.04-arm", "target": "aarch64-unknown-linux-gnu",   "bundles": "appimage", "artifact_ext": ".AppImage", "mode": ["full"] },
+      { "runner": "macos-15",       "target": "x86_64-apple-darwin",          "bundles": "dmg",      "artifact_ext": ".dmg",      "mode": ["full"] },
+      { "runner": "macos-15",       "target": "aarch64-apple-darwin",          "bundles": "dmg",      "artifact_ext": ".dmg",      "mode": ["full"] }
+    ],
+    "android": [
+      { "runner": "ubuntu-latest", "target": "aarch64-linux-android",   "mode": ["full"] },
+      { "runner": "ubuntu-latest", "target": "armv7-linux-androideabi", "mode": ["full"] },
+      { "runner": "ubuntu-latest", "target": "x86_64-linux-android",    "mode": ["full"] }
+    ],
+    "ios": [
+      { "runner": "macos-15", "target": "aarch64-apple-ios", "mode": ["full"] }
+    ]
+  }
+}

@@ -1,0 +1,1626 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace_ref:
+        description: "Source ref in FileUni-WorkSpace (tag/branch/sha). Default: main"
+        required: false
+        default: "main"
+      build_mode:
+        description: "Build mode: full (all configured platforms) or minimal (CLI musl + GUI x64 AppImage)"
+        type: choice
+        options:
+          - full
+          - minimal
+        required: false
+        default: "full"
+      build_target:
+        description: "Build target set: cli / gui / cli+gui"
+        type: choice
+        options:
+          - cli+gui
+          - cli
+          - gui
+        required: false
+        default: "cli+gui"
+      prerelease:
+        description: "Mark as pre-release"
+        type: boolean
+        required: false
+        default: true
+      enable_upx:
+        description: "Create UPX-compressed copies of binaries"
+        type: boolean
+        required: false
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.run_id }}
+  cancel-in-progress: false
+
+env:
+  WORKSPACE_REPO: FileUni/FileUni-WorkSpace
+  CARGO_DIST_VERSION: "0.28.0"
+
+jobs:
+  resolve-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      workspace_ref: ${{ steps.meta.outputs.workspace_ref }}
+      release_tag: ${{ steps.meta.outputs.release_tag }}
+      dist_tag: ${{ steps.meta.outputs.dist_tag }}
+      pkg_version: ${{ steps.meta.outputs.pkg_version }}
+      cli_cargo_dist: ${{ steps.matrix.outputs.cli_cargo_dist }}
+      cli_cross: ${{ steps.matrix.outputs.cli_cross }}
+      cli_android: ${{ steps.matrix.outputs.cli_android }}
+      cli_vmactions: ${{ steps.matrix.outputs.cli_vmactions }}
+      cli_nfpm: ${{ steps.matrix.outputs.cli_nfpm }}
+      gui_tauri: ${{ steps.matrix.outputs.gui_tauri }}
+      gui_android: ${{ steps.matrix.outputs.gui_android }}
+      gui_ios: ${{ steps.matrix.outputs.gui_ios }}
+      has_cli: ${{ steps.matrix.outputs.has_cli }}
+      has_gui: ${{ steps.matrix.outputs.has_gui }}
+      has_cargo_dist: ${{ steps.matrix.outputs.has_cargo_dist }}
+      has_cross: ${{ steps.matrix.outputs.has_cross }}
+      has_android: ${{ steps.matrix.outputs.has_android }}
+      has_vmactions: ${{ steps.matrix.outputs.has_vmactions }}
+      has_nfpm: ${{ steps.matrix.outputs.has_nfpm }}
+      has_gui_tauri: ${{ steps.matrix.outputs.has_gui_tauri }}
+      has_gui_android: ${{ steps.matrix.outputs.has_gui_android }}
+      has_gui_ios: ${{ steps.matrix.outputs.has_gui_ios }}
+    steps:
+      - name: Resolve workspace ref
+        id: resolve-ref
+        run: |
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Checkout community repo
+        uses: actions/checkout@v4
+        with:
+          path: community
+
+      - name: Resolve release metadata
+        id: meta
+        working-directory: workspace
+        run: |
+          ref="${{ steps.resolve-ref.outputs.ref }}"
+          echo "workspace_ref=${ref}" >> "$GITHUB_OUTPUT"
+
+          pkg_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fileuni") | .version')"
+          echo "dist_tag=v${pkg_version}" >> "$GITHUB_OUTPUT"
+          echo "pkg_version=${pkg_version}" >> "$GITHUB_OUTPUT"
+
+          if echo "${ref}" | grep -qE '^v[0-9]+\.[0-9]+'; then
+            release_tag="${ref}"
+          else
+            release_tag="Release_$(date -u '+%Y%m%d_%H%M%S')"
+          fi
+          echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
+          echo "::notice::dist_tag=v${pkg_version}  release_tag=${release_tag}  ref=${ref}"
+
+      - name: Resolve build matrix
+        id: matrix
+        run: |
+          mode="${{ github.event.inputs.build_mode }}"
+          mode="${mode:-full}"
+          target_set="${{ github.event.inputs.build_target }}"
+          target_set="${target_set:-cli+gui}"
+
+          # Strip JSONC comments and parse
+          sed 's|//.*||' community/.github/build_matrix.jsonc | jq -c '.' > /tmp/matrix.json
+
+          # Filter targets by mode for each build method
+          cli_cargo_dist="$(jq -c --arg m "$mode" '[.cli["cargo-dist"][] | select(.mode | index($m))]' /tmp/matrix.json)"
+          cli_cross="$(jq -c --arg m "$mode" '[.cli.cross[] | select(.mode | index($m))]' /tmp/matrix.json)"
+          cli_android="$(jq -c --arg m "$mode" '[.cli.android[] | select(.mode | index($m))]' /tmp/matrix.json)"
+          cli_vmactions="$(jq -c --arg m "$mode" '[.cli.vmactions[] | select(.mode | index($m))]' /tmp/matrix.json)"
+          gui_tauri="$(jq -c --arg m "$mode" '[.gui.tauri[] | select(.mode | index($m))]' /tmp/matrix.json)"
+          gui_android="$(jq -c --arg m "$mode" '[(.gui.android // [])[] | select(.mode | index($m))]' /tmp/matrix.json)"
+          gui_ios="$(jq -c --arg m "$mode" '[(.gui.ios // [])[] | select(.mode | index($m))]' /tmp/matrix.json)"
+
+          if [ "$target_set" = "cli" ]; then
+            gui_tauri='[]'
+            gui_android='[]'
+            gui_ios='[]'
+          elif [ "$target_set" = "gui" ]; then
+            cli_cargo_dist='[]'
+            cli_cross='[]'
+            cli_android='[]'
+            cli_vmactions='[]'
+          fi
+
+          # nFPM targets: all Linux targets with non-empty nfpm_arch from both cargo-dist and cross
+          cli_nfpm="$(jq -c '
+            [
+              (.[] | select(.nfpm_arch != "") | {target, nfpm_arch, artifact: ("cli-" + .target)})
+            ]
+          ' <(jq -c -n --argjson a "$cli_cargo_dist" --argjson b "$cli_cross" '$a + $b'))"
+
+          has_cli=false
+          if [ "$target_set" = "cli" ] || [ "$target_set" = "cli+gui" ]; then
+            has_cli=true
+          fi
+
+          has_gui=false
+          if [ "$target_set" = "gui" ] || [ "$target_set" = "cli+gui" ]; then
+            has_gui=true
+          fi
+
+          echo "cli_cargo_dist=${cli_cargo_dist}" >> "$GITHUB_OUTPUT"
+          echo "cli_cross=${cli_cross}" >> "$GITHUB_OUTPUT"
+          echo "cli_android=${cli_android}" >> "$GITHUB_OUTPUT"
+          echo "cli_vmactions=${cli_vmactions}" >> "$GITHUB_OUTPUT"
+          echo "cli_nfpm=${cli_nfpm}" >> "$GITHUB_OUTPUT"
+          echo "gui_tauri=${gui_tauri}" >> "$GITHUB_OUTPUT"
+          echo "gui_android=${gui_android}" >> "$GITHUB_OUTPUT"
+          echo "gui_ios=${gui_ios}" >> "$GITHUB_OUTPUT"
+          echo "has_cli=${has_cli}" >> "$GITHUB_OUTPUT"
+          echo "has_gui=${has_gui}" >> "$GITHUB_OUTPUT"
+
+          # has_* flags for conditional job execution
+          echo "has_cargo_dist=$([ "$(echo "$cli_cargo_dist" | jq 'length')" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_cross=$([ "$(echo "$cli_cross" | jq 'length')" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_android=$([ "$(echo "$cli_android" | jq 'length')" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_vmactions=$([ "$(echo "$cli_vmactions" | jq 'length')" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_nfpm=$([ "$(echo "$cli_nfpm" | jq 'length')" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_gui_tauri=$([ "$(echo "$gui_tauri" | jq 'length')" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_gui_android=$([ "$(echo "$gui_android" | jq 'length')" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "has_gui_ios=$([ "$(echo "$gui_ios" | jq 'length')" -gt 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+          echo "::notice::mode=${mode} target=${target_set} cli_cargo_dist=$(echo "$cli_cargo_dist" | jq 'length') cli_cross=$(echo "$cli_cross" | jq 'length') cli_android=$(echo "$cli_android" | jq 'length') cli_vmactions=$(echo "$cli_vmactions" | jq 'length') cli_nfpm=$(echo "$cli_nfpm" | jq 'length') gui_tauri=$(echo "$gui_tauri" | jq 'length') gui_android=$(echo "$gui_android" | jq 'length') gui_ios=$(echo "$gui_ios" | jq 'length')"
+
+  build-frontend-cli:
+    needs: resolve-matrix
+    if: needs.resolve-matrix.outputs.has_cli == 'true' || needs.resolve-matrix.outputs.has_gui == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+            workspace/frontends/cli/node_modules
+            workspace/frontends/shared/node_modules
+          key: bun-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: bun-
+
+      - name: Build CLI frontend
+        working-directory: workspace/frontends
+        run: |
+          bun install
+          bun run --cwd cli build
+          test -f cli/dist/index.html
+
+      - name: Upload CLI frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-cli-dist
+          path: workspace/frontends/cli/dist
+
+  build-frontend-gui:
+    needs: resolve-matrix
+    if: needs.resolve-matrix.outputs.has_gui == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+            workspace/frontends/gui/node_modules
+            workspace/frontends/shared/node_modules
+          key: bun-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: bun-
+
+      - name: Build GUI frontend
+        working-directory: workspace/frontends
+        run: |
+          bun install
+          bun run --cwd gui build
+          test -f gui/dist/index.html
+
+      - name: Upload GUI frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-gui-dist
+          path: workspace/frontends/gui/dist
+
+  # ============================================================
+  # Tier 1/2: cargo-dist native builds
+  # ============================================================
+  build-cli:
+    needs: [resolve-matrix, build-frontend-cli]
+    if: needs.resolve-matrix.outputs.has_cargo_dist == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.resolve-matrix.outputs.cli_cargo_dist) }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-cli-dist
+          path: workspace/frontends/cli/dist
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cargo-dist
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-dist@${{ env.CARGO_DIST_VERSION }}
+
+      - name: Install musl-tools
+        if: matrix.target == 'x86_64-unknown-linux-musl'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y musl-tools
+
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
+
+      - name: Setup Zig (for cross-compilation)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        uses: mlugg/setup-zig@v2
+        with:
+          version: "0.13.0"
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: workspace
+          key: ${{ matrix.target }}
+
+      - name: Build via cargo-dist
+        working-directory: workspace
+        run: dist build --tag="${{ needs.resolve-matrix.outputs.dist_tag }}" --target "${{ matrix.target }}" --artifacts=local
+
+      - name: Fallback build for i686 Windows
+        if: matrix.target == 'i686-pc-windows-msvc'
+        shell: bash
+        working-directory: workspace
+        run: |
+          shopt -s nullglob
+          files=(target/distrib/*)
+          if [ ${#files[@]} -gt 0 ]; then
+            exit 0
+          fi
+          cargo build --release --package fileuni --target "${{ matrix.target }}"
+
+      - name: Create fallback artifact when distrib is empty
+        shell: bash
+        run: |
+          zip_one() {
+            out="$1"
+            input="$2"
+            if command -v zip >/dev/null 2>&1; then
+              zip -j "${out}" "${input}"
+              return
+            fi
+            if command -v python3 >/dev/null 2>&1; then
+              python3 -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+              return
+            fi
+            python -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+          }
+
+          shopt -s nullglob
+          files=(workspace/target/distrib/*)
+          if [ ${#files[@]} -gt 0 ]; then
+            exit 0
+          fi
+
+          target="${{ matrix.target }}"
+          if [[ "${target}" == *windows* ]]; then
+            bin="$(find workspace/target -type f -name 'fileuni.exe' | grep "${target}" | head -1 || true)"
+          else
+            bin="workspace/target/${target}/release/fileuni"
+            if [ ! -f "${bin}" ]; then
+              bin="$(find workspace/target -type f -name 'fileuni' | grep "${target}" | head -1 || true)"
+            fi
+          fi
+          if [ ! -f "${bin}" ]; then
+            echo "::error::No binary found for ${target}"
+            find workspace/target -maxdepth 6 -type f | sed -n '1,200p'
+            exit 1
+          fi
+
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          if [[ "${target}" == *windows* ]]; then
+            os="windows"
+          elif [[ "${target}" == *apple-darwin* ]]; then
+            os="macos"
+          elif [[ "${target}" == *linux-android* ]]; then
+            os="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            os="freebsd"
+          elif [[ "${target}" == *linux* ]]; then
+            os="linux"
+          else
+            os="unknown"
+          fi
+          if [[ "${target}" == *musl* ]]; then
+            libc="musl"
+          elif [[ "${target}" == *gnu* ]]; then
+            libc="gnu"
+          elif [[ "${target}" == *msvc* ]]; then
+            libc="msvc"
+          elif [[ "${target}" == *darwin* ]]; then
+            libc="darwin"
+          elif [[ "${target}" == *android* ]]; then
+            libc="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            libc="freebsd"
+          else
+            libc="native"
+          fi
+          base="FileUni-cli-${arch}-${os}-${libc}"
+
+          mkdir -p dist-fallback
+          if [[ "${target}" == *windows* ]]; then
+            zip_one "dist-fallback/${base}.exe.zip" "${bin}"
+          else
+            tar -cJf "dist-fallback/${base}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
+          fi
+
+      - name: Package raw binary zip
+        shell: bash
+        run: |
+          zip_one() {
+            out="$1"
+            input="$2"
+            if command -v zip >/dev/null 2>&1; then
+              zip -j "${out}" "${input}"
+              return
+            fi
+            if command -v python3 >/dev/null 2>&1; then
+              python3 -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+              return
+            fi
+            python -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+          }
+
+          target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          if [[ "${target}" == *windows* ]]; then
+            os="windows"
+          elif [[ "${target}" == *apple-darwin* ]]; then
+            os="macos"
+          elif [[ "${target}" == *linux-android* ]]; then
+            os="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            os="freebsd"
+          elif [[ "${target}" == *linux* ]]; then
+            os="linux"
+          else
+            os="unknown"
+          fi
+          if [[ "${target}" == *musl* ]]; then
+            libc="musl"
+          elif [[ "${target}" == *gnu* ]]; then
+            libc="gnu"
+          elif [[ "${target}" == *msvc* ]]; then
+            libc="msvc"
+          elif [[ "${target}" == *darwin* ]]; then
+            libc="darwin"
+          elif [[ "${target}" == *android* ]]; then
+            libc="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            libc="freebsd"
+          else
+            libc="native"
+          fi
+          base="FileUni-cli-${arch}-${os}-${libc}"
+
+          if [[ "${target}" == *windows* ]]; then
+            bin="workspace/target/${target}/release/fileuni.exe"
+            if [ ! -f "${bin}" ]; then
+              bin="$(find workspace/target -type f -name 'fileuni.exe' | grep "${target}" | head -1 || true)"
+            fi
+          else
+            bin="workspace/target/${target}/release/fileuni"
+            if [ ! -f "${bin}" ]; then
+              bin="$(find workspace/target -type f -name 'fileuni' | grep "${target}" | head -1 || true)"
+            fi
+          fi
+
+          if [ ! -f "${bin}" ]; then
+            echo "::error::No raw binary found for ${target}"
+            exit 1
+          fi
+
+          mkdir -p dist-raw
+          if [[ "${target}" == *windows* ]]; then
+            zip_one "dist-raw/${base}.exe.zip" "${bin}"
+          else
+            zip -j "dist-raw/${base}.zip" "${bin}"
+          fi
+
+      - name: Create UPX raw binary zip
+        if: github.event.inputs.enable_upx != 'false'
+        shell: bash
+        run: |
+          zip_one() {
+            out="$1"
+            input="$2"
+            if command -v zip >/dev/null 2>&1; then
+              zip -j "${out}" "${input}"
+              return
+            fi
+            if command -v python3 >/dev/null 2>&1; then
+              python3 -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+              return
+            fi
+            python -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+          }
+
+          target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          if [[ "${target}" == *windows* ]]; then
+            os="windows"
+          elif [[ "${target}" == *apple-darwin* ]]; then
+            os="macos"
+          elif [[ "${target}" == *linux-android* ]]; then
+            os="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            os="freebsd"
+          elif [[ "${target}" == *linux* ]]; then
+            os="linux"
+          else
+            os="unknown"
+          fi
+          if [[ "${target}" == *musl* ]]; then
+            libc="musl"
+          elif [[ "${target}" == *gnu* ]]; then
+            libc="gnu"
+          elif [[ "${target}" == *msvc* ]]; then
+            libc="msvc"
+          elif [[ "${target}" == *darwin* ]]; then
+            libc="darwin"
+          elif [[ "${target}" == *android* ]]; then
+            libc="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            libc="freebsd"
+          else
+            libc="native"
+          fi
+          base="FileUni-cli-${arch}-${os}-${libc}"
+
+          if [[ "${target}" == *windows* ]]; then
+            bin="workspace/target/${target}/release/fileuni.exe"
+            if [ ! -f "${bin}" ]; then
+              bin="$(find workspace/target -type f -name 'fileuni.exe' | grep "${target}" | head -1 || true)"
+            fi
+          else
+            bin="workspace/target/${target}/release/fileuni"
+            if [ ! -f "${bin}" ]; then
+              bin="$(find workspace/target -type f -name 'fileuni' | grep "${target}" | head -1 || true)"
+            fi
+          fi
+
+          if [ ! -f "${bin}" ]; then
+            echo "::error::No binary found for UPX: ${target}"
+            exit 1
+          fi
+
+          case "${RUNNER_OS}" in
+            Linux)
+              sudo apt-get update -qq
+              sudo apt-get install -y -qq upx-ucl > /dev/null 2>&1
+              upx_cmd="upx"
+              ;;
+            macOS)
+              brew install upx
+              upx_cmd="upx"
+              ;;
+            Windows)
+              tmpdir="${RUNNER_TEMP:-/tmp}"
+              mkdir -p "${tmpdir}/upx"
+              downloaded=false
+              for url in \
+                "https://github.com/upx/upx/releases/download/v5.0.0/upx-5.0.0-win64.zip" \
+                "https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-win64.zip"; do
+                if curl -fsSL -o "${tmpdir}/upx.zip" "${url}"; then
+                  downloaded=true
+                  break
+                fi
+              done
+              if [ "${downloaded}" != "true" ]; then
+                echo "::error::Failed to download UPX binary"
+                exit 1
+              fi
+              python3 -c "import os,zipfile; t=os.environ.get('RUNNER_TEMP','/tmp'); zipfile.ZipFile(f'{t}/upx.zip').extractall(f'{t}/upx')"
+              upx_cmd="$(find "${tmpdir}/upx" -type f -iname 'upx.exe' | head -1)"
+              if [ -z "${upx_cmd}" ]; then
+                echo "::error::UPX executable not found"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::Unsupported runner OS: ${RUNNER_OS}"
+              exit 1
+              ;;
+          esac
+
+          ext=""
+          if [[ "${bin}" == *.exe ]]; then
+            ext=".exe"
+          fi
+          upx_bin="$(dirname "${bin}")/fileuni-upx${ext}"
+          cp "${bin}" "${upx_bin}"
+          upx_opts=(--best --lzma)
+          if [[ "${target}" == *apple-darwin* ]]; then
+            upx_opts+=(--force-macos)
+          fi
+          "${upx_cmd}" "${upx_opts[@]}" "${upx_bin}"
+
+          mkdir -p dist-upx
+          if [[ "${target}" == *windows* ]]; then
+            zip_one "dist-upx/${base}.upx.exe.zip" "${upx_bin}"
+          else
+            zip -j "dist-upx/${base}.upx.zip" "${upx_bin}"
+          fi
+
+      - name: Upload UPX artifacts
+        if: github.event.inputs.enable_upx != 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}-upx
+          path: dist-upx/*
+          if-no-files-found: error
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: |
+            workspace/target/distrib/*
+            dist-fallback/*
+            dist-raw/*
+
+  # ============================================================
+  # Cross-compiled builds (Linux exotic)
+  # ============================================================
+  build-cli-cross:
+    needs: [resolve-matrix, build-frontend-cli]
+    if: needs.resolve-matrix.outputs.has_cross == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.resolve-matrix.outputs.cli_cross) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-cli-dist
+          path: workspace/frontends/cli/dist
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cross
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cross
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: workspace
+          key: cross-${{ matrix.target }}
+
+      - name: Build via cross
+        working-directory: workspace
+        run: cross build --release --package fileuni --target "${{ matrix.target }}"
+
+      - name: Package binary
+        run: |
+          target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          if [[ "${target}" == *windows* ]]; then
+            os="windows"
+          elif [[ "${target}" == *apple-darwin* ]]; then
+            os="macos"
+          elif [[ "${target}" == *linux-android* ]]; then
+            os="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            os="freebsd"
+          elif [[ "${target}" == *linux* ]]; then
+            os="linux"
+          else
+            os="unknown"
+          fi
+          if [[ "${target}" == *musl* ]]; then
+            libc="musl"
+          elif [[ "${target}" == *gnu* ]]; then
+            libc="gnu"
+          elif [[ "${target}" == *msvc* ]]; then
+            libc="msvc"
+          elif [[ "${target}" == *darwin* ]]; then
+            libc="darwin"
+          elif [[ "${target}" == *android* ]]; then
+            libc="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            libc="freebsd"
+          else
+            libc="native"
+          fi
+          base="FileUni-cli-${arch}-${os}-${libc}"
+
+          bin="workspace/target/${target}/release/fileuni"
+          if [ ! -f "${bin}" ]; then
+            bin="workspace/target/${target}/release/fileuni.exe"
+          fi
+          mkdir -p dist
+          if echo "${target}" | grep -q "windows"; then
+            zip -j "dist/${base}.exe.zip" "${bin}"
+          else
+            zip -j "dist/${base}.zip" "${bin}"
+            tar -cJf "dist/${base}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
+          fi
+
+      - name: Create UPX-compressed copy
+        if: github.event.inputs.enable_upx != 'false' && !contains(matrix.target, 'riscv64')
+        run: |
+          target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          if [[ "${target}" == *windows* ]]; then
+            os="windows"
+          elif [[ "${target}" == *apple-darwin* ]]; then
+            os="macos"
+          elif [[ "${target}" == *linux-android* ]]; then
+            os="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            os="freebsd"
+          elif [[ "${target}" == *linux* ]]; then
+            os="linux"
+          else
+            os="unknown"
+          fi
+          if [[ "${target}" == *musl* ]]; then
+            libc="musl"
+          elif [[ "${target}" == *gnu* ]]; then
+            libc="gnu"
+          elif [[ "${target}" == *msvc* ]]; then
+            libc="msvc"
+          elif [[ "${target}" == *darwin* ]]; then
+            libc="darwin"
+          elif [[ "${target}" == *android* ]]; then
+            libc="android"
+          elif [[ "${target}" == *freebsd* ]]; then
+            libc="freebsd"
+          else
+            libc="native"
+          fi
+          base="FileUni-cli-${arch}-${os}-${libc}"
+
+          bin="workspace/target/${target}/release/fileuni"
+          if [ ! -f "${bin}" ]; then
+            echo "::error::Binary not found for UPX: ${bin}"
+            exit 1
+          fi
+
+          sudo apt-get update -qq && sudo apt-get install -y -qq upx-ucl > /dev/null 2>&1
+
+          cp "${bin}" "${bin}-upx"
+          upx --best --lzma "${bin}-upx"
+
+          mkdir -p dist-upx
+          zip -j "dist-upx/${base}.upx.zip" "${bin}-upx"
+          tar -cJf "dist-upx/${base}.upx.tar.xz" -C "$(dirname "${bin}")" "fileuni-upx"
+
+      - name: Upload UPX artifacts
+        if: github.event.inputs.enable_upx != 'false' && !contains(matrix.target, 'riscv64')
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}-upx
+          path: dist-upx/*
+          if-no-files-found: error
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: dist/*
+
+  # ============================================================
+  # Android builds (cargo-ndk)
+  # ============================================================
+  build-cli-android:
+    needs: [resolve-matrix, build-frontend-cli]
+    if: needs.resolve-matrix.outputs.has_android == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.resolve-matrix.outputs.cli_android) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-cli-dist
+          path: workspace/frontends/cli/dist
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Setup Android SDK/NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Build Android binary
+        working-directory: workspace
+        run: cargo ndk -t ${{ matrix.ndk_abi }} build --release --package fileuni
+
+      - name: Package binary
+        run: |
+          target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          os="android"
+          libc="android"
+          base="FileUni-cli-${arch}-${os}-${libc}"
+
+          bin="$(find workspace/target -path "*/release/fileuni" | grep "${target}" | head -1 || true)"
+          if [ -z "${bin}" ]; then
+            echo "::error::Android binary not found for ${target}"
+            find workspace/target -maxdepth 5 -type f | sed -n '1,200p'
+            exit 1
+          fi
+          mkdir -p dist
+          zip -j "dist/${base}.zip" "${bin}"
+          tar -cJf "dist/${base}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
+
+      - name: Create UPX-compressed copy
+        if: github.event.inputs.enable_upx != 'false'
+        run: |
+          target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          base="FileUni-cli-${arch}-android-android"
+
+          bin="$(find workspace/target -path "*/release/fileuni" | grep "${target}" | head -1 || true)"
+          if [ -z "${bin}" ] || [ ! -f "${bin}" ]; then
+            echo "::error::Android binary not found for UPX: ${target}"
+            exit 1
+          fi
+
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq upx-ucl > /dev/null 2>&1
+
+          upx_bin="$(dirname "${bin}")/fileuni-upx"
+          cp "${bin}" "${upx_bin}"
+          upx --best --lzma "${upx_bin}"
+
+          mkdir -p dist-upx
+          zip -j "dist-upx/${base}.upx.zip" "${upx_bin}"
+
+      - name: Upload UPX artifacts
+        if: github.event.inputs.enable_upx != 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}-upx
+          path: dist-upx/*
+          if-no-files-found: error
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: dist/*
+
+  # ============================================================
+  # GUI builds via Tauri (unsigned)
+  # ============================================================
+  build-gui:
+    needs: [resolve-matrix, build-frontend-cli, build-frontend-gui]
+    if: needs.resolve-matrix.outputs.has_gui_tauri == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.resolve-matrix.outputs.gui_tauri) }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+
+      - name: Download GUI frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-gui-dist
+          path: workspace/frontends/gui/dist
+
+      - name: Download CLI frontend dist (required by embedded assets)
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-cli-dist
+          path: workspace/frontends/cli/dist
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux dependencies for Tauri
+        if: startsWith(matrix.runner, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            xdg-utils \
+            patchelf
+
+      - name: Install cargo-tauri CLI
+        working-directory: workspace/apps/gui
+        run: cargo install tauri-cli --version '^2.0' --locked
+
+      - name: Build GUI bundles (unsigned)
+        working-directory: workspace/apps/gui
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('tauri.conf.json')
+          cfg = json.loads(p.read_text())
+          bundle = cfg.setdefault('bundle', {})
+          target = "${{ matrix.target }}"
+          if target == 'x86_64-pc-windows-msvc':
+            # Windows: build raw .exe only, no msi/nsis bundling
+            bundle['active'] = False
+          else:
+            bundle['active'] = True
+          cfg['bundle']['icon'] = ['icons/icon.ico', 'icons/icon.png']
+          Path('tauri.ci.conf.json').write_text(json.dumps(cfg))
+          PY
+          if [[ "${{ matrix.target }}" == *"unknown-linux"* ]]; then
+            export CARGO_PROFILE_RELEASE_STRIP=symbols
+            export CARGO_PROFILE_RELEASE_DEBUG=0
+          fi
+          if [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ]; then
+            cargo tauri build --target "${{ matrix.target }}" --config tauri.ci.conf.json
+          else
+            cargo tauri build --target "${{ matrix.target }}" --bundles "${{ matrix.bundles }}" --config tauri.ci.conf.json
+          fi
+
+      - name: Package GUI artifact
+        shell: bash
+        run: |
+          zip_one() {
+            out="$1"
+            input="$2"
+            if command -v zip >/dev/null 2>&1; then
+              zip -j "${out}" "${input}"
+              return
+            fi
+            if command -v python3 >/dev/null 2>&1; then
+              python3 -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+              return
+            fi
+            python -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+          }
+
+          mkdir -p dist
+          target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          if [[ "${target}" == *windows* ]]; then
+            os="windows"
+          elif [[ "${target}" == *apple-darwin* ]]; then
+            os="macos"
+          elif [[ "${target}" == *linux* ]]; then
+            os="linux"
+          else
+            os="unknown"
+          fi
+          if [[ "${target}" == *musl* ]]; then
+            libc="musl"
+          elif [[ "${target}" == *gnu* ]]; then
+            libc="gnu"
+          elif [[ "${target}" == *msvc* ]]; then
+            libc="msvc"
+          elif [[ "${target}" == *darwin* ]]; then
+            libc="darwin"
+          else
+            libc="native"
+          fi
+          base="FileUni-gui-${arch}-${os}-${libc}"
+
+          if [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ]; then
+            file="workspace/target/${{ matrix.target }}/release/fileuni-gui.exe"
+            if [ ! -f "${file}" ]; then
+              file="$(find workspace/target/${{ matrix.target }}/release -maxdepth 1 -type f -name '*.exe' 2>/dev/null | head -1 || true)"
+            fi
+            if [ -z "${file}" ] || [ ! -f "${file}" ]; then
+              file="$(find workspace/apps/gui/target/${{ matrix.target }}/release -maxdepth 1 -type f -name '*.exe' 2>/dev/null | head -1 || true)"
+            fi
+          else
+            ext="${{ matrix.artifact_ext }}"
+            file="$(find workspace/target/${{ matrix.target }}/release/bundle -type f -name "*${ext}" 2>/dev/null | head -1 || true)"
+            if [ -z "${file}" ] || [ ! -f "${file}" ]; then
+              file="$(find workspace/apps/gui/target/${{ matrix.target }}/release/bundle -type f -name "*${ext}" 2>/dev/null | head -1 || true)"
+            fi
+          fi
+          if [ -z "${file}" ] || [ ! -f "${file}" ]; then
+            echo "::error::No GUI artifact found for target ${{ matrix.target }}"
+            exit 1
+          fi
+          if [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ]; then
+            zip_one "dist/${base}.exe.zip" "${file}"
+          else
+            ext="${file##*.}"
+            cp "${file}" "dist/${base}.${ext}"
+          fi
+
+      - name: Create GUI Windows UPX-compressed copy
+        if: matrix.target == 'x86_64-pc-windows-msvc' && github.event.inputs.enable_upx != 'false'
+        shell: bash
+        run: |
+          zip_one() {
+            out="$1"
+            input="$2"
+            if command -v zip >/dev/null 2>&1; then
+              zip -j "${out}" "${input}"
+              return
+            fi
+            if command -v python3 >/dev/null 2>&1; then
+              python3 -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+              return
+            fi
+            python -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+          }
+
+          target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          base="FileUni-gui-${arch}-windows-msvc"
+
+          src="workspace/target/${target}/release/fileuni-gui.exe"
+          if [ ! -f "${src}" ]; then
+            src="$(find workspace/target/${target}/release -maxdepth 1 -type f -name '*.exe' 2>/dev/null | head -1 || true)"
+          fi
+          if [ -z "${src}" ] || [ ! -f "${src}" ]; then
+            src="$(find workspace/apps/gui/target/${target}/release -maxdepth 1 -type f -name '*.exe' 2>/dev/null | head -1 || true)"
+          fi
+          if [ -z "${src}" ]; then
+            echo "::error::No Windows GUI exe found for UPX"
+            exit 1
+          fi
+
+          downloaded=false
+          tmpdir="${RUNNER_TEMP:-/tmp}"
+          mkdir -p "${tmpdir}/upx"
+          for url in \
+            "https://github.com/upx/upx/releases/download/v5.0.0/upx-5.0.0-win64.zip" \
+            "https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-win64.zip"; do
+            if curl -fsSL -o "${tmpdir}/upx.zip" "${url}"; then
+              downloaded=true
+              break
+            fi
+          done
+          if [ "${downloaded}" != "true" ]; then
+            echo "::error::Failed to download UPX binary"
+            exit 1
+          fi
+
+          if ! python3 -c "import os,zipfile; t=os.environ.get('RUNNER_TEMP','/tmp'); zipfile.ZipFile(f'{t}/upx.zip').extractall(f'{t}/upx')"; then
+            echo "::error::Failed to extract UPX archive"
+            exit 1
+          fi
+
+          upx_bin="$(find "${tmpdir}/upx" -type f -iname 'upx.exe' | head -1)"
+          if [ -z "${upx_bin}" ]; then
+            echo "::error::UPX executable not found"
+            exit 1
+          fi
+
+          mkdir -p dist-upx
+          out="dist-upx/${base}.upx.exe"
+          cp "${src}" "${out}"
+          "$upx_bin" --best --lzma "${out}"
+          zip_one "dist-upx/${base}.upx.exe.zip" "${out}"
+
+      - name: Upload GUI Windows UPX artifact
+        if: matrix.target == 'x86_64-pc-windows-msvc' && github.event.inputs.enable_upx != 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-${{ matrix.target }}-upx
+          path: dist-upx/*.zip
+          if-no-files-found: error
+
+      - name: Upload GUI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-${{ matrix.target }}
+          path: dist/*
+
+  build-gui-android:
+    needs: [resolve-matrix, build-frontend-cli, build-frontend-gui]
+    if: needs.resolve-matrix.outputs.has_gui_android == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.resolve-matrix.outputs.gui_android) }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+
+      - name: Download GUI frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-gui-dist
+          path: workspace/frontends/gui/dist
+
+      - name: Download CLI frontend dist (required by embedded assets)
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-cli-dist
+          path: workspace/frontends/cli/dist
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK/NDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install cargo-tauri CLI
+        working-directory: workspace/apps/gui
+        run: cargo install tauri-cli --version '^2.0' --locked
+
+      - name: Initialize Android project if missing
+        working-directory: workspace/apps/gui
+        shell: bash
+        run: |
+          if [ ! -d "gen/android" ]; then
+            cargo tauri android init --ci
+          fi
+
+      - name: Build Android APK (unsigned)
+        working-directory: workspace/apps/gui
+        shell: bash
+        run: |
+          apk_opt=()
+          tauri_target="${{ matrix.target }}"
+          case "${{ matrix.target }}" in
+            aarch64-linux-android) tauri_target="aarch64" ;;
+            armv7-linux-androideabi) tauri_target="armv7" ;;
+            x86_64-linux-android) tauri_target="x86_64" ;;
+          esac
+          if cargo tauri android build --help | grep -q -- '--apk'; then
+            apk_opt+=(--apk)
+          fi
+          cargo tauri android build --ci --target "${tauri_target}" --config tauri.android.conf.json "${apk_opt[@]}"
+
+      - name: Package Android artifact
+        shell: bash
+        run: |
+          target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          base="FileUni-gui-${arch}-android-android"
+
+          apk="$(find workspace/apps/gui -type f -name '*.apk' | grep -E '(release|unsigned)' | head -1 || true)"
+          if [ -z "${apk}" ] || [ ! -f "${apk}" ]; then
+            apk="$(find workspace/apps/gui -type f -name '*.apk' | head -1 || true)"
+          fi
+          if [ -z "${apk}" ] || [ ! -f "${apk}" ]; then
+            echo "::error::No APK artifact found for target ${target}"
+            exit 1
+          fi
+
+          mkdir -p dist
+          cp "${apk}" "dist/${base}.apk"
+
+      - name: Upload GUI Android artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-android-${{ matrix.target }}
+          path: dist/*
+
+  build-gui-ios:
+    needs: [resolve-matrix, build-frontend-cli, build-frontend-gui]
+    if: needs.resolve-matrix.outputs.has_gui_ios == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.resolve-matrix.outputs.gui_ios) }}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+
+      - name: Download GUI frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-gui-dist
+          path: workspace/frontends/gui/dist
+
+      - name: Download CLI frontend dist (required by embedded assets)
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-cli-dist
+          path: workspace/frontends/cli/dist
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Install cargo-tauri CLI
+        working-directory: workspace/apps/gui
+        run: cargo install tauri-cli --version '^2.0' --locked
+
+      - name: Initialize iOS project if missing
+        working-directory: workspace/apps/gui
+        shell: bash
+        run: |
+          if [ ! -d "gen/apple" ]; then
+            cargo tauri ios init --ci
+          fi
+
+      - name: Build iOS IPA (unsigned)
+        working-directory: workspace/apps/gui
+        shell: bash
+        run: |
+          tauri_target="${{ matrix.target }}"
+          case "${{ matrix.target }}" in
+            aarch64-apple-ios) tauri_target="aarch64" ;;
+          esac
+          ios_opts=()
+          if cargo tauri ios build --help | grep -q -- '--no-codesign'; then
+            ios_opts+=(--no-codesign)
+          fi
+          cargo tauri ios build --ci --target "${tauri_target}" --config tauri.ios.conf.json "${ios_opts[@]}"
+
+      - name: Package iOS artifact
+        shell: bash
+        run: |
+          ipa="$(find workspace/apps/gui -type f -name '*.ipa' | head -1 || true)"
+          if [ -z "${ipa}" ] || [ ! -f "${ipa}" ]; then
+            app="$(find workspace/apps/gui -type d -name '*.app' | head -1 || true)"
+            if [ -z "${app}" ] || [ ! -d "${app}" ]; then
+              echo "::error::No .ipa or .app artifact found for target ${{ matrix.target }}"
+              exit 1
+            fi
+            rm -rf /tmp/ios-payload
+            mkdir -p /tmp/ios-payload/Payload
+            cp -R "${app}" /tmp/ios-payload/Payload/
+            (cd /tmp/ios-payload && zip -r -q unsigned.ipa Payload)
+            ipa="/tmp/ios-payload/unsigned.ipa"
+          fi
+
+          mkdir -p dist
+          cp "${ipa}" "dist/FileUni-gui-aarch64-ios-darwin.ipa"
+
+      - name: Upload GUI iOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-ios-${{ matrix.target }}
+          path: dist/*
+
+  # ============================================================
+  # BSD builds via vmactions (FreeBSD native VM)
+  # ============================================================
+  build-cli-bsd:
+    needs: [resolve-matrix, build-frontend-cli]
+    if: needs.resolve-matrix.outputs.has_vmactions == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.resolve-matrix.outputs.cli_vmactions) }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-cli-dist
+          path: workspace/frontends/cli/dist
+
+      - name: Build on FreeBSD
+        if: matrix.os == 'freebsd'
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: ${{ matrix.release }}
+          usesh: true
+          copyback: true
+          mem: 8192
+          prepare: |
+            pkg install -y rust curl zip upx
+          run: |
+            cd workspace
+            cargo build --release --package fileuni
+            if [ "${{ github.event.inputs.enable_upx }}" != "false" ]; then
+              upx --best --lzma target/release/fileuni -o target/release/fileuni-upx
+            fi
+            ls -la target/release/fileuni
+
+      - name: Package binary
+        run: |
+          target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          base="FileUni-cli-${arch}-freebsd-freebsd"
+
+          bin="workspace/target/release/fileuni"
+          if [ ! -f "${bin}" ]; then
+            echo "::error::Binary not found at ${bin}"
+            exit 1
+          fi
+          mkdir -p dist
+          zip -j "dist/${base}.zip" "${bin}"
+          tar -cJf "dist/${base}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
+
+      - name: Package UPX binary
+        if: github.event.inputs.enable_upx != 'false'
+        run: |
+          target="${{ matrix.target }}"
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          base="FileUni-cli-${arch}-freebsd-freebsd"
+
+          upx_bin="workspace/target/release/fileuni-upx"
+          if [ ! -f "${upx_bin}" ]; then
+            echo "::error::FreeBSD UPX binary not found at ${upx_bin}"
+            exit 1
+          fi
+          mkdir -p dist-upx
+          zip -j "dist-upx/${base}.upx.zip" "${upx_bin}"
+
+      - name: Upload UPX artifacts
+        if: github.event.inputs.enable_upx != 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}-upx
+          path: dist-upx/*
+          if-no-files-found: error
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.target }}
+          path: dist/*
+
+  # ============================================================
+  # Linux packaging via nFPM (deb/rpm/apk/archlinux/ipk)
+  # ============================================================
+  package-linux:
+    needs: [resolve-matrix, build-cli, build-cli-cross]
+    if: ${{
+      !cancelled() &&
+      needs.resolve-matrix.outputs.has_nfpm == 'true' &&
+      (needs.resolve-matrix.outputs.has_cargo_dist != 'true' || needs.build-cli.result == 'success') &&
+      (needs.resolve-matrix.outputs.has_cross != 'true' || needs.build-cli-cross.result == 'success')
+      }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.resolve-matrix.outputs.cli_nfpm) }}
+    steps:
+      - name: Download binary artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: artifact
+
+      - name: Extract binary
+        run: |
+          mkdir -p binary
+          file="$(find artifact -type f -name '*.tar.xz' | head -1)"
+          if [ -n "${file}" ]; then
+            tar -xJf "${file}" -C binary
+          else
+            direct_bin="$(find artifact -type f -name fileuni | head -1)"
+            if [ -n "${direct_bin}" ]; then
+              cp "${direct_bin}" binary/fileuni
+            fi
+          fi
+
+          real_bin="$(find binary -type f -name fileuni | head -1)"
+          if [ -z "${real_bin}" ]; then
+            echo "::error::Extracted package does not contain fileuni binary"
+            find binary -maxdepth 5 -type f | sed -n '1,200p'
+            exit 1
+          fi
+          if [ "${real_bin}" != "binary/fileuni" ]; then
+            cp "${real_bin}" binary/fileuni
+          fi
+          chmod +x binary/fileuni
+          ls -la binary/
+
+      - name: Install nFPM
+        uses: secondlife/setup-nfpm@v3
+        with:
+          version: 2.45.0
+
+      - name: Create nfpm config
+        env:
+          NFPM_ARCH: ${{ matrix.nfpm_arch }}
+          VERSION: ${{ needs.resolve-matrix.outputs.pkg_version }}
+        run: |
+          cat > nfpm.yaml <<NFPM
+          name: fileuni
+          arch: ${NFPM_ARCH}
+          version: ${VERSION}
+          maintainer: FileUni Team <contact@fileuni.com>
+          description: FileUni - Modular file platform
+          homepage: https://github.com/FileUni
+          license: MIT
+          contents:
+            - src: ./binary/fileuni
+              dst: /usr/bin/fileuni
+              file_info:
+                mode: 0755
+          NFPM
+
+      - name: Build packages
+        env:
+          NFPM_ARCH: ${{ matrix.nfpm_arch }}
+          VERSION: ${{ needs.resolve-matrix.outputs.pkg_version }}
+        run: |
+          mkdir -p packages
+          target="${{ matrix.target }}"
+
+          arch_raw="${target%%-*}"
+          arch="${arch_raw}"
+          case "${arch_raw}" in
+            x86_64) arch="amd64" ;;
+            aarch64|arm64) arch="aarch64" ;;
+          esac
+          os="linux"
+          if [[ "${target}" == *musl* ]]; then
+            libc="musl"
+          elif [[ "${target}" == *gnu* ]]; then
+            libc="gnu"
+          else
+            libc="linux"
+          fi
+          base="FileUni-cli-${arch}-${os}-${libc}"
+
+          for fmt in deb rpm apk archlinux ipk; do
+            nfpm package --packager "${fmt}" --config nfpm.yaml --target "packages/" 2>&1 || echo "::warning::${fmt} packaging failed for ${target}"
+          done
+
+          shopt -s nullglob
+          for p in packages/*; do
+            name="$(basename "${p}")"
+            if [[ "${name}" == *.pkg.tar.zst ]]; then
+              ext="pkg.tar.zst"
+            else
+              ext="${name##*.}"
+            fi
+            mv "${p}" "packages/${base}.${ext}"
+          done
+
+          ls -la packages/
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.target }}
+          path: packages/*
+
+  publish:
+    needs: [resolve-matrix, build-cli, build-cli-cross, build-cli-android, build-cli-bsd, build-gui, build-gui-android, build-gui-ios, package-linux]
+    if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "{cli-*,gui-*,packages-*}"
+          path: /tmp/release
+          merge-multiple: true
+
+      - name: Keep only standardized release filenames
+        run: |
+          find /tmp/release -type f | while read -r f; do
+            bn="$(basename "$f")"
+            if [[ "$bn" != FileUni-* ]]; then
+              rm -f "$f"
+            fi
+          done
+
+      - name: List release files
+        run: |
+          echo "=== Release artifacts ==="
+          find /tmp/release -type f | sort
+          count="$(find /tmp/release -type f | wc -l)"
+          echo "Total: ${count} files"
+          if [ "${count}" -eq 0 ]; then
+            echo "::error::No release artifacts found"
+            exit 1
+          fi
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.resolve-matrix.outputs.release_tag }}
+          name: ${{ needs.resolve-matrix.outputs.release_tag }}
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          fail_on_unmatched_files: false
+          files: /tmp/release/*
+          body: |
+            ## FileUni ${{ needs.resolve-matrix.outputs.release_tag }}
+
+            Built from [`${{ needs.resolve-matrix.outputs.workspace_ref }}`](https://github.com/${{ env.WORKSPACE_REPO }}/tree/${{ needs.resolve-matrix.outputs.workspace_ref }})
