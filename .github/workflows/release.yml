@@ -31,6 +31,7 @@ jobs:
       workspace_ref: ${{ steps.meta.outputs.workspace_ref }}
       release_tag: ${{ steps.meta.outputs.release_tag }}
       dist_tag: ${{ steps.meta.outputs.dist_tag }}
+      pkg_version: ${{ steps.meta.outputs.pkg_version }}
     steps:
       - name: Resolve workspace ref
         id: resolve-ref
@@ -56,18 +57,16 @@ jobs:
           ref="${{ steps.resolve-ref.outputs.ref }}"
           echo "workspace_ref=${ref}" >> "$GITHUB_OUTPUT"
 
-          # dist_tag: from Cargo.toml version (for cargo-dist --tag)
           pkg_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fileuni") | .version')"
           echo "dist_tag=v${pkg_version}" >> "$GITHUB_OUTPUT"
+          echo "pkg_version=${pkg_version}" >> "$GITHUB_OUTPUT"
 
-          # release_tag: if ref looks like a version tag, use it; otherwise auto-generate
           if echo "${ref}" | grep -qE '^v[0-9]+\.[0-9]+'; then
             release_tag="${ref}"
           else
             release_tag="Release_$(date -u '+%Y%m%d_%H%M%S')"
           fi
           echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
-
           echo "::notice::dist_tag=v${pkg_version}  release_tag=${release_tag}  ref=${ref}"
 
       - name: Setup Bun
@@ -97,19 +96,108 @@ jobs:
           name: frontend-dist
           path: workspace/frontends/cli/dist
 
-  build-cli:
+  # ============================================================
+  # Tier 1: cargo-dist builds (verified, commented out for testing)
+  # Uncomment for production releases.
+  # ============================================================
+  # build-cli:
+  #   needs: build-frontends
+  #   strategy:
+  #     fail-fast: true
+  #     matrix:
+  #       include:
+  #         - { runner: ubuntu-latest,  target: x86_64-unknown-linux-gnu }
+  #         - { runner: ubuntu-latest,  target: x86_64-unknown-linux-musl }
+  #         - { runner: ubuntu-latest,  target: aarch64-unknown-linux-gnu }
+  #         - { runner: windows-latest, target: x86_64-pc-windows-msvc }
+  #         - { runner: macos-15,       target: x86_64-apple-darwin }
+  #         - { runner: macos-15,       target: aarch64-apple-darwin }
+  #   runs-on: ${{ matrix.runner }}
+  #   steps:
+  #     - name: Checkout workspace
+  #       uses: actions/checkout@v4
+  #       with:
+  #         repository: ${{ env.WORKSPACE_REPO }}
+  #         ref: ${{ needs.build-frontends.outputs.workspace_ref }}
+  #         token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+  #         path: workspace
+  #         submodules: true
+  #         fetch-depth: 0
+  #         fetch-tags: true
+  #
+  #     - name: Download frontend dist
+  #       uses: actions/download-artifact@v4
+  #       with:
+  #         name: frontend-dist
+  #         path: workspace/frontends/cli/dist
+  #
+  #     - name: Setup Rust
+  #       uses: dtolnay/rust-toolchain@stable
+  #       with:
+  #         targets: ${{ matrix.target }}
+  #
+  #     - name: Install cargo-dist
+  #       uses: taiki-e/install-action@v2
+  #       with:
+  #         tool: cargo-dist@${{ env.CARGO_DIST_VERSION }}
+  #
+  #     - name: Install musl-tools
+  #       if: matrix.target == 'x86_64-unknown-linux-musl'
+  #       run: |
+  #         sudo apt-get update
+  #         sudo apt-get install -y musl-tools
+  #
+  #     - name: Install cross-compilation tools
+  #       if: matrix.target == 'aarch64-unknown-linux-gnu'
+  #       uses: taiki-e/install-action@v2
+  #       with:
+  #         tool: cargo-zigbuild
+  #
+  #     - name: Setup Zig (for cross-compilation)
+  #       if: matrix.target == 'aarch64-unknown-linux-gnu'
+  #       uses: mlugg/setup-zig@v2
+  #       with:
+  #         version: "0.13.0"
+  #
+  #     - name: Cache Rust
+  #       uses: Swatinem/rust-cache@v2
+  #       with:
+  #         workspaces: workspace
+  #         key: ${{ matrix.target }}
+  #
+  #     - name: Build via cargo-dist
+  #       working-directory: workspace
+  #       run: dist build --tag="${{ needs.build-frontends.outputs.dist_tag }}" --target "${{ matrix.target }}" --artifacts=local
+  #
+  #     - name: Upload artifacts
+  #       uses: actions/upload-artifact@v4
+  #       with:
+  #         name: cli-${{ matrix.target }}
+  #         path: workspace/target/distrib/*
+
+  # ============================================================
+  # Tier 2: cross-compiled builds (experimental)
+  # ============================================================
+  build-cli-cross:
     needs: build-frontends
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
-          - { runner: ubuntu-latest,  target: x86_64-unknown-linux-gnu }
-          - { runner: ubuntu-latest,  target: x86_64-unknown-linux-musl }
-          - { runner: ubuntu-latest,  target: aarch64-unknown-linux-gnu }
-          - { runner: windows-latest, target: x86_64-pc-windows-msvc }
-          - { runner: macos-15,       target: x86_64-apple-darwin }
-          - { runner: macos-15,       target: aarch64-apple-darwin }
-    runs-on: ${{ matrix.runner }}
+          # --- Linux ARM ---
+          - { target: aarch64-unknown-linux-musl,    nfpm_arch: arm64  }
+          - { target: armv7-unknown-linux-musleabihf, nfpm_arch: armhf  }
+          # --- Linux RISC-V ---
+          - { target: riscv64gc-unknown-linux-gnu,   nfpm_arch: riscv64 }
+          # --- Linux PowerPC ---
+          - { target: powerpc64le-unknown-linux-gnu, nfpm_arch: ppc64le }
+          # --- Linux MIPS (OpenWrt routers) ---
+          - { target: mipsel-unknown-linux-musl,     nfpm_arch: mipsel }
+          - { target: mips64el-unknown-linux-muslabi64, nfpm_arch: mips64el }
+          # --- BSD ---
+          - { target: x86_64-unknown-freebsd,        nfpm_arch: ""     }
+          - { target: x86_64-unknown-netbsd,         nfpm_arch: ""     }
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout workspace
         uses: actions/checkout@v4
@@ -119,8 +207,6 @@ jobs:
           token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
           path: workspace
           submodules: true
-          fetch-depth: 0
-          fetch-tags: true
 
       - name: Download frontend dist
         uses: actions/download-artifact@v4
@@ -133,55 +219,147 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
-      - name: Install cargo-dist
+      - name: Install cross
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-dist@${{ env.CARGO_DIST_VERSION }}
-
-      - name: Install musl-tools
-        if: matrix.target == 'x86_64-unknown-linux-musl'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y musl-tools
-
-      - name: Install cross-compilation tools
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-zigbuild
-
-      - name: Setup Zig (for cross-compilation)
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        uses: mlugg/setup-zig@v2
-        with:
-          version: "0.13.0"
+          tool: cross
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: workspace
-          key: ${{ matrix.target }}
+          key: cross-${{ matrix.target }}
 
-      - name: Build via cargo-dist
+      - name: Build via cross
         working-directory: workspace
-        run: dist build --tag="${{ needs.build-frontends.outputs.dist_tag }}" --target "${{ matrix.target }}" --artifacts=local
+        run: cross build --release --package fileuni --target "${{ matrix.target }}"
+
+      - name: Package binary
+        run: |
+          target="${{ matrix.target }}"
+          bin="workspace/target/${target}/release/fileuni"
+          if [ ! -f "${bin}" ]; then
+            bin="workspace/target/${target}/release/fileuni.exe"
+          fi
+          mkdir -p dist
+          if echo "${target}" | grep -q "windows"; then
+            zip "dist/fileuni-${target}.zip" "${bin}"
+          else
+            tar -cJf "dist/fileuni-${target}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: cli-${{ matrix.target }}
-          path: workspace/target/distrib/*
+          path: dist/*
 
-  publish:
-    needs: [build-frontends, build-cli]
+  # ============================================================
+  # Linux packaging via nFPM (deb/rpm/apk/archlinux/ipk)
+  # Runs after all Linux builds complete, packages each arch.
+  # ============================================================
+  package-linux:
+    needs: [build-frontends, build-cli-cross]
+    # needs: [build-frontends, build-cli, build-cli-cross]  # uncomment when build-cli is active
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # map each Linux target to nFPM arch + artifact name
+          # --- from build-cli (commented out for now) ---
+          # - { target: x86_64-unknown-linux-gnu,   nfpm_arch: amd64,   artifact: cli-x86_64-unknown-linux-gnu }
+          # - { target: x86_64-unknown-linux-musl,  nfpm_arch: amd64,   artifact: cli-x86_64-unknown-linux-musl }
+          # - { target: aarch64-unknown-linux-gnu,  nfpm_arch: arm64,   artifact: cli-aarch64-unknown-linux-gnu }
+          # --- from build-cli-cross ---
+          - { target: aarch64-unknown-linux-musl,    nfpm_arch: arm64,   artifact: cli-aarch64-unknown-linux-musl }
+          - { target: armv7-unknown-linux-musleabihf, nfpm_arch: armhf,   artifact: cli-armv7-unknown-linux-musleabihf }
+          - { target: riscv64gc-unknown-linux-gnu,   nfpm_arch: riscv64, artifact: cli-riscv64gc-unknown-linux-gnu }
+          - { target: powerpc64le-unknown-linux-gnu, nfpm_arch: ppc64le, artifact: cli-powerpc64le-unknown-linux-gnu }
+          - { target: mipsel-unknown-linux-musl,     nfpm_arch: mipsel,  artifact: cli-mipsel-unknown-linux-musl }
+          - { target: mips64el-unknown-linux-muslabi64, nfpm_arch: mips64el, artifact: cli-mips64el-unknown-linux-muslabi64 }
     steps:
-      - name: Download all CLI artifacts
+      - name: Download binary artifact
         uses: actions/download-artifact@v4
         with:
-          pattern: cli-*
+          name: ${{ matrix.artifact }}
+          path: artifact
+
+      - name: Extract binary
+        run: |
+          mkdir -p binary
+          file="$(ls artifact/fileuni-*.tar.xz 2>/dev/null | head -1)"
+          if [ -n "${file}" ]; then
+            tar -xJf "${file}" -C binary
+          else
+            cp artifact/fileuni binary/ 2>/dev/null || true
+          fi
+          chmod +x binary/fileuni || true
+          ls -la binary/
+
+      - name: Install nFPM
+        uses: secondlife/setup-nfpm@v1
+
+      - name: Create nfpm config
+        run: |
+          cat > nfpm.yaml <<'NFPM'
+          name: fileuni
+          arch: ${NFPM_ARCH}
+          version: ${VERSION}
+          maintainer: FileUni Team <contact@fileuni.com>
+          description: FileUni - Modular file platform
+          homepage: https://github.com/FileUni
+          license: MIT
+          contents:
+            - src: ./binary/fileuni
+              dst: /usr/bin/fileuni
+              file_info:
+                mode: 0755
+          NFPM
+
+      - name: Build packages
+        env:
+          NFPM_ARCH: ${{ matrix.nfpm_arch }}
+          VERSION: ${{ needs.build-frontends.outputs.pkg_version }}
+        run: |
+          mkdir -p packages
+          target="${{ matrix.target }}"
+
+          for fmt in deb rpm srpm apk archlinux ipk; do
+            nfpm package --packager "${fmt}" --config nfpm.yaml --target "packages/" 2>&1 || echo "::warning::${fmt} packaging failed for ${target}"
+          done
+
+          ls -la packages/
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.target }}
+          path: packages/*
+
+  publish:
+    needs: [build-frontends, build-cli-cross, package-linux]
+    # needs: [build-frontends, build-cli, build-cli-cross, package-linux]  # uncomment when build-cli is active
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: "{cli-*,packages-*}"
           path: /tmp/release
           merge-multiple: true
+
+      - name: List release files
+        run: |
+          echo "=== Release artifacts ==="
+          find /tmp/release -type f | sort
+          count="$(find /tmp/release -type f | wc -l)"
+          echo "Total: ${count} files"
+          if [ "${count}" -eq 0 ]; then
+            echo "::error::No release artifacts found"
+            exit 1
+          fi
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -189,6 +367,7 @@ jobs:
           tag_name: ${{ needs.build-frontends.outputs.release_tag }}
           name: ${{ needs.build-frontends.outputs.release_tag }}
           prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          fail_on_unmatched_files: false
           files: /tmp/release/*
           body: |
             ## FileUni ${{ needs.build-frontends.outputs.release_tag }}
