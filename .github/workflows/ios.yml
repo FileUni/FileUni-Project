@@ -88,7 +88,7 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: tauri-cli@2
-          fallback: none
+          fallback: cargo-binstall
 
       - name: Verify cargo-tauri binary architecture
         shell: bash
@@ -98,10 +98,18 @@ jobs:
           cargo-tauri -V
           bin_info="$(file "$(command -v cargo-tauri)")"
           echo "${bin_info}"
-          if ! echo "${bin_info}" | grep -q 'arm64'; then
-            echo "::error::cargo-tauri is not arm64 binary"
-            exit 1
+          if echo "${bin_info}" | grep -q 'arm64'; then
+            exit 0
           fi
+
+          echo "::warning::cargo-tauri is not arm64, switching to Bun/NPM arm64 Tauri CLI wrapper"
+          bun add -g @tauri-apps/cli@2
+          mkdir -p "${HOME}/.cargo/bin"
+          printf '%s\n' '#!/usr/bin/env bash' 'set -euo pipefail' 'exec bunx --bun tauri "$@"' > "${HOME}/.cargo/bin/cargo-tauri"
+          chmod +x "${HOME}/.cargo/bin/cargo-tauri"
+
+          which cargo-tauri
+          cargo-tauri -V
 
       - name: Initialize iOS project if missing
         working-directory: workspace/apps/gui
