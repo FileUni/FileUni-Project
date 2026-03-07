@@ -349,6 +349,20 @@ jobs:
       - name: Create fallback artifact when distrib is empty
         shell: bash
         run: |
+          zip_one() {
+            out="$1"
+            input="$2"
+            if command -v zip >/dev/null 2>&1; then
+              zip -j "${out}" "${input}"
+              return
+            fi
+            if command -v python3 >/dev/null 2>&1; then
+              python3 -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+              return
+            fi
+            python -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+          }
+
           shopt -s nullglob
           files=(workspace/target/distrib/*)
           if [ ${#files[@]} -gt 0 ]; then
@@ -408,7 +422,7 @@ jobs:
 
           mkdir -p dist-fallback
           if [[ "${target}" == *windows* ]]; then
-            zip -j "dist-fallback/${base}.exe.zip" "${bin}"
+            zip_one "dist-fallback/${base}.exe.zip" "${bin}"
           else
             tar -cJf "dist-fallback/${base}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
           fi
@@ -416,6 +430,20 @@ jobs:
       - name: Package raw binary zip
         shell: bash
         run: |
+          zip_one() {
+            out="$1"
+            input="$2"
+            if command -v zip >/dev/null 2>&1; then
+              zip -j "${out}" "${input}"
+              return
+            fi
+            if command -v python3 >/dev/null 2>&1; then
+              python3 -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+              return
+            fi
+            python -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+          }
+
           target="${{ matrix.target }}"
           arch_raw="${target%%-*}"
           arch="${arch_raw}"
@@ -472,7 +500,7 @@ jobs:
 
           mkdir -p dist-raw
           if [[ "${target}" == *windows* ]]; then
-            zip -j "dist-raw/${base}.exe.zip" "${bin}"
+            zip_one "dist-raw/${base}.exe.zip" "${bin}"
           else
             zip -j "dist-raw/${base}.zip" "${bin}"
           fi
@@ -481,6 +509,20 @@ jobs:
         if: github.event.inputs.enable_upx != 'false'
         shell: bash
         run: |
+          zip_one() {
+            out="$1"
+            input="$2"
+            if command -v zip >/dev/null 2>&1; then
+              zip -j "${out}" "${input}"
+              return
+            fi
+            if command -v python3 >/dev/null 2>&1; then
+              python3 -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+              return
+            fi
+            python -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+          }
+
           target="${{ matrix.target }}"
           arch_raw="${target%%-*}"
           arch="${arch_raw}"
@@ -584,7 +626,7 @@ jobs:
 
           mkdir -p dist-upx
           if [[ "${target}" == *windows* ]]; then
-            zip -j "dist-upx/${base}.upx.exe.zip" "${upx_bin}"
+            zip_one "dist-upx/${base}.upx.exe.zip" "${upx_bin}"
           else
             zip -j "dist-upx/${base}.upx.zip" "${upx_bin}"
           fi
@@ -970,6 +1012,20 @@ jobs:
       - name: Package GUI artifact
         shell: bash
         run: |
+          zip_one() {
+            out="$1"
+            input="$2"
+            if command -v zip >/dev/null 2>&1; then
+              zip -j "${out}" "${input}"
+              return
+            fi
+            if command -v python3 >/dev/null 2>&1; then
+              python3 -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+              return
+            fi
+            python -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+          }
+
           mkdir -p dist
           target="${{ matrix.target }}"
           arch_raw="${target%%-*}"
@@ -1020,7 +1076,7 @@ jobs:
             exit 1
           fi
           if [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ]; then
-            zip -j "dist/${base}.exe.zip" "${file}"
+            zip_one "dist/${base}.exe.zip" "${file}"
           else
             ext="${file##*.}"
             cp "${file}" "dist/${base}.${ext}"
@@ -1030,6 +1086,20 @@ jobs:
         if: matrix.target == 'x86_64-pc-windows-msvc' && github.event.inputs.enable_upx != 'false'
         shell: bash
         run: |
+          zip_one() {
+            out="$1"
+            input="$2"
+            if command -v zip >/dev/null 2>&1; then
+              zip -j "${out}" "${input}"
+              return
+            fi
+            if command -v python3 >/dev/null 2>&1; then
+              python3 -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+              return
+            fi
+            python -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
+          }
+
           target="${{ matrix.target }}"
           arch_raw="${target%%-*}"
           arch="${arch_raw}"
@@ -1082,7 +1152,7 @@ jobs:
           out="dist-upx/${base}.upx.exe"
           cp "${src}" "${out}"
           "$upx_bin" --best --lzma "${out}"
-          zip -j "dist-upx/${base}.upx.exe.zip" "${out}"
+          zip_one "dist-upx/${base}.upx.exe.zip" "${out}"
 
       - name: Upload GUI Windows UPX artifact
         if: matrix.target == 'x86_64-pc-windows-msvc' && github.event.inputs.enable_upx != 'false'
