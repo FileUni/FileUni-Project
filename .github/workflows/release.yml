@@ -422,11 +422,13 @@ jobs:
               upx_cmd="upx"
               ;;
             Windows)
+              tmpdir="${RUNNER_TEMP:-/tmp}"
+              mkdir -p "${tmpdir}/upx"
               downloaded=false
               for url in \
                 "https://github.com/upx/upx/releases/download/v5.0.0/upx-5.0.0-win64.zip" \
                 "https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-win64.zip"; do
-                if curl -fsSL -o /tmp/upx.zip "${url}"; then
+                if curl -fsSL -o "${tmpdir}/upx.zip" "${url}"; then
                   downloaded=true
                   break
                 fi
@@ -437,9 +439,11 @@ jobs:
               fi
               python3 - <<'PY'
               import zipfile
-              zipfile.ZipFile('/tmp/upx.zip').extractall('/tmp/upx')
+              import os
+              tmpdir = os.environ.get('RUNNER_TEMP', '/tmp')
+              zipfile.ZipFile(f'{tmpdir}/upx.zip').extractall(f'{tmpdir}/upx')
               PY
-              upx_cmd="$(find /tmp/upx -type f -iname 'upx.exe' | head -1)"
+              upx_cmd="$(find "${tmpdir}/upx" -type f -iname 'upx.exe' | head -1)"
               if [ -z "${upx_cmd}" ]; then
                 echo "::error::UPX executable not found"
                 exit 1
@@ -735,6 +739,10 @@ jobs:
           cfg['bundle']['icon'] = ['icons/icon.ico', 'icons/icon.png']
           Path('tauri.ci.conf.json').write_text(json.dumps(cfg))
           PY
+          if [[ "${{ matrix.target }}" == *"unknown-linux"* ]]; then
+            export CARGO_PROFILE_RELEASE_STRIP=symbols
+            export CARGO_PROFILE_RELEASE_DEBUG=0
+          fi
           if [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ]; then
             cargo tauri build --target "${{ matrix.target }}" --config tauri.ci.conf.json
           else
@@ -777,10 +785,12 @@ jobs:
           fi
 
           downloaded=false
+          tmpdir="${RUNNER_TEMP:-/tmp}"
+          mkdir -p "${tmpdir}/upx"
           for url in \
             "https://github.com/upx/upx/releases/download/v5.0.0/upx-5.0.0-win64.zip" \
             "https://github.com/upx/upx/releases/download/v4.2.4/upx-4.2.4-win64.zip"; do
-            if curl -fsSL -o /tmp/upx.zip "${url}"; then
+            if curl -fsSL -o "${tmpdir}/upx.zip" "${url}"; then
               downloaded=true
               break
             fi
@@ -792,14 +802,16 @@ jobs:
 
           if ! python3 - <<'PY'
           import zipfile
-          zipfile.ZipFile('/tmp/upx.zip').extractall('/tmp/upx')
+          import os
+          tmpdir = os.environ.get('RUNNER_TEMP', '/tmp')
+          zipfile.ZipFile(f'{tmpdir}/upx.zip').extractall(f'{tmpdir}/upx')
           PY
           then
             echo "::error::Failed to extract UPX archive"
             exit 1
           fi
 
-          upx_bin="$(find /tmp/upx -type f -iname 'upx.exe' | head -1)"
+          upx_bin="$(find "${tmpdir}/upx" -type f -iname 'upx.exe' | head -1)"
           if [ -z "${upx_bin}" ]; then
             echo "::error::UPX executable not found"
             exit 1
