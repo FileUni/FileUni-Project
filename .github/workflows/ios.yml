@@ -60,9 +60,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # Avoid Node/Vite OOM on macOS arm64 hosted runners.
+          export NODE_OPTIONS="--max-old-space-size=8192"
           bun install
-          bun run --cwd cli build
-          bun run --cwd gui build
+          bun run --cwd cli build | tee /tmp/frontend-cli-build.log
+          bun run --cwd gui build | tee /tmp/frontend-gui-build.log
           test -f cli/dist/index.html
           test -f gui/dist/index.html
 
@@ -82,17 +84,24 @@ jobs:
           workspaces: workspace
           key: ios-aarch64-apple-ios
 
-      - name: Install cargo-tauri CLI (native arm64)
+      - name: Install cargo-tauri CLI
+        uses: taiki-e/install-action@v2
+        with:
+          tool: tauri-cli@2
+          fallback: none
+
+      - name: Verify cargo-tauri binary architecture
         shell: bash
         run: |
           set -euo pipefail
-          if command -v cargo-tauri >/dev/null 2>&1; then
-            rm -f "$(command -v cargo-tauri)"
-          fi
-          cargo install tauri-cli --locked --version '^2' --force
           which cargo-tauri
           cargo-tauri -V
-          file "$(command -v cargo-tauri)"
+          bin_info="$(file "$(command -v cargo-tauri)")"
+          echo "${bin_info}"
+          if ! echo "${bin_info}" | grep -q 'arm64'; then
+            echo "::error::cargo-tauri is not arm64 binary"
+            exit 1
+          fi
 
       - name: Initialize iOS project if missing
         working-directory: workspace/apps/gui
@@ -170,6 +179,8 @@ jobs:
         with:
           name: ios-build-logs
           path: |
+            /tmp/frontend-cli-build.log
+            /tmp/frontend-gui-build.log
             /tmp/xcodebuild-ios.log
             workspace/apps/gui/gen/apple/build/**/Logs/**
           if-no-files-found: ignore
