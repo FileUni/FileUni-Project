@@ -44,4 +44,4 @@ FileUni 的主要开发工作区位于私有 monorepo，本仓库会同步部分
 - 不允许商业使用
 - 不允许基于 FileUni 构建或分发竞争性产品
 
-如需咨询使用、授权或合作，请在本仓库提交 Issue。
+如需咨询使用、授权或合作，联系 email：`contact@fileuni.com`。

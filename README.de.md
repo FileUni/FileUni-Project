@@ -44,4 +44,4 @@ Der veröffentlichte Quellcode ist für Lesen, Review, Release-Automatisierung s
 - Kommerzielle Nutzung ist nicht erlaubt
 - Aufbau oder Vertrieb konkurrierender Produkte auf Basis von FileUni ist nicht erlaubt
 
-Bei Fragen zu Nutzung, Lizenzierung oder Zusammenarbeit bitte ein Issue in diesem Repository öffnen.
+Bei Fragen zu Nutzung, Lizenzierung oder Zusammenarbeit kontaktieren Sie bitte: `contact@fileuni.com`.
