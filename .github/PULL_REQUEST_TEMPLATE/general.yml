@@ -1,0 +1,50 @@
+name: General Pull Request
+description: Submit a pull request for FileUni-Project
+title: "[PR]: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        > Please read [CLA](https://github.com/FileUni/FileUni-Project/blob/main/CLA.md) and [CONTRIBUTING.md](../CONTRIBUTING.md) before submitting.
+
+  - type: input
+    id: related-issue
+    attributes:
+      label: Related Issue
+      description: Link to the related issue (if any)
+      placeholder: "#123"
+    validations:
+      required: false
+
+  - type: input
+    id: related-discussion
+    attributes:
+      label: Related Discussion
+      description: Link to related discussion (required for feature or improvement scope)
+      placeholder: "#456"
+    validations:
+      required: false
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Modification Summary
+      description: Briefly describe what changes you made
+      placeholder: |
+        - 
+        - 
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: self-check
+    attributes:
+      label: Self-Check List
+      description: Please check all items that apply
+      options:
+        - label: Code compiles without errors
+        - label: Tests pass locally
+        - label: No unnecessary code changes
+        - label: Documentation updated (if applicable)
+        - label: For feature/improvement scope, linked approved Discussion and documented security/performance impact
