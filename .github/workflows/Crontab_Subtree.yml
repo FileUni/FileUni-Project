@@ -1,0 +1,86 @@
+name: Crontab Subtree Sync
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace_ref:
+        description: "Source ref in FileUni-WorkSpace (branch/tag/sha). Default: main"
+        required: false
+        default: "main"
+  schedule:
+    - cron: "35 */1 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crontab-subtree-sync
+  cancel-in-progress: false
+
+env:
+  WORKSPACE_REPO: FileUni/FileUni-WorkSpace
+  WORKSPACE_DEFAULT_REF: main
+
+jobs:
+  subtree-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve workspace ref
+        id: resolve-ref
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-${WORKSPACE_DEFAULT_REF}}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_PROJECT_TRIGGER_TOKEN }}
+          path: workspace
+          fetch-depth: 0
+          submodules: true
+          fetch-tags: true
+
+      - name: Configure git identity
+        working-directory: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Push FileUni subtrees
+        working-directory: workspace
+        env:
+          FILEUNI_PROJECT_TRIGGER_TOKEN: ${{ secrets.FILEUNI_PROJECT_TRIGGER_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          trigger_token="${FILEUNI_PROJECT_TRIGGER_TOKEN:-}"
+          if [ -z "${trigger_token}" ]; then
+            echo "::error::missing FILEUNI_PROJECT_TRIGGER_TOKEN"
+            exit 1
+          fi
+
+          push_subtree() {
+            local prefix="$1"
+            local repo="$2"
+
+            echo "::group::subtree push ${prefix} -> ${repo}"
+            git subtree push \
+              --prefix="${prefix}" \
+              "https://x-access-token:${trigger_token}@github.com/${repo}.git" \
+              main
+            echo "::endgroup::"
+          }
+
+          push_subtree "FileUni-Project" "FileUni/FileUni-Project"
+          push_subtree "OfficialSiteDocs" "FileUni/OfficialSiteDocs"
+          push_subtree "OfficialSitePrivate" "FileUni/OfficialSitePrivate"
+          push_subtree "crates/yh-filemanager-vfs-storage-hub" "FileUni/yh-filemanager-vfs-storage-hub"
