@@ -39,9 +39,6 @@ Kho này chứa lớp dự án công khai của FileUni. Các mô-đun bổ sung
 
 Mã nguồn được công bố nhằm phục vụ việc đọc, review, tự động hóa release, và khả năng quan sát cho bảo mật hoặc audit.
 
-## Hạn chế sử dụng
-
-- Không được phép sử dụng cho mục đích thương mại
-- Không được phép xây dựng hoặc phân phối sản phẩm cạnh tranh dựa trên FileUni
+Điều khoản sử dụng mã nguồn và cấp phép vui lòng xem trực tiếp tại [LICENSE](https://github.com/FileUni/FileUni-Project/blob/main/LICENSE).
 
 Nếu có câu hỏi về sử dụng, cấp phép hoặc hợp tác, vui lòng liên hệ: `contact@fileuni.com`.

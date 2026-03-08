@@ -39,9 +39,6 @@ FileUni 的主要开发工作区位于私有 monorepo，本仓库会同步部分
 
 已发布源码主要用于阅读、审查、发布自动化，以及安全与审计可见性。
 
-## 使用限制
-
-- 不允许商业使用
-- 不允许基于 FileUni 构建或分发竞争性产品
+源码使用与授权条款请直接参见 [LICENSE](https://github.com/FileUni/FileUni-Project/blob/main/LICENSE)。
 
 如需咨询使用、授权或合作，联系 email：`contact@fileuni.com`。

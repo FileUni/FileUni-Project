@@ -39,9 +39,6 @@ Ce dépôt contient la couche publique du projet FileUni. D'autres modules pourr
 
 Le code publié est destiné à la lecture, à la revue, à l'automatisation des releases et à la visibilité de sécurité ou d'audit.
 
-## Restrictions d'utilisation
-
-- L'usage commercial n'est pas autorisé
-- Il est interdit de créer ou distribuer des produits concurrents basés sur FileUni
+Pour les conditions d'utilisation du code source et de licence, consultez directement [LICENSE](https://github.com/FileUni/FileUni-Project/blob/main/LICENSE).
 
 Pour toute question sur l'usage, la licence ou la collaboration, contactez : `contact@fileuni.com`.

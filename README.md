@@ -39,9 +39,6 @@ This repository contains the public project layer of FileUni. Additional modules
 
 The published source is intended for reading, review, release automation, and security or audit visibility.
 
-## Usage Restrictions
-
-- Commercial use is not permitted
-- Building or distributing competing FileUni-based products is not permitted
+For source usage and licensing terms, see [LICENSE](https://github.com/FileUni/FileUni-Project/blob/main/LICENSE).
 
 For usage, licensing, or collaboration questions, contact email: `contact@fileuni.com`.

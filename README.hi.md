@@ -39,9 +39,6 @@
 
 प्रकाशित source reading, review, release automation, और security या audit visibility के लिए है।
 
-## उपयोग प्रतिबंध
-
-- व्यावसायिक उपयोग की अनुमति नहीं है
-- FileUni-आधारित प्रतिस्पर्धी उत्पाद बनाना या वितरित करना अनुमति प्राप्त नहीं है
+स्रोत कोड के उपयोग और लाइसेंस शर्तों के लिए सीधे [LICENSE](https://github.com/FileUni/FileUni-Project/blob/main/LICENSE) देखें।
 
 उपयोग, licensing, या collaboration से जुड़े प्रश्नों के लिए संपर्क करें: `contact@fileuni.com`।

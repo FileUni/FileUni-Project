@@ -39,9 +39,6 @@ Dieses Repository enthält die öffentliche Projektebene von FileUni. Weitere Mo
 
 Der veröffentlichte Quellcode ist für Lesen, Review, Release-Automatisierung sowie Sicherheits- und Audit-Transparenz gedacht.
 
-## Nutzungsbeschränkungen
-
-- Kommerzielle Nutzung ist nicht erlaubt
-- Aufbau oder Vertrieb konkurrierender Produkte auf Basis von FileUni ist nicht erlaubt
+Die Nutzungs- und Lizenzbedingungen des Quellcodes finden Sie direkt in [LICENSE](https://github.com/FileUni/FileUni-Project/blob/main/LICENSE).
 
 Bei Fragen zu Nutzung, Lizenzierung oder Zusammenarbeit kontaktieren Sie bitte: `contact@fileuni.com`.

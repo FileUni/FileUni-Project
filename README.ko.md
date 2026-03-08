@@ -39,9 +39,6 @@
 
 공개된 소스는 열람, 리뷰, 릴리스 자동화, 그리고 보안 및 감사 가시성을 위해 제공됩니다.
 
-## 사용 제한
-
-- 상업적 사용은 허용되지 않습니다
-- FileUni 기반 경쟁 제품의 제작 또는 배포는 허용되지 않습니다
+소스 코드 사용 및 라이선스 조건은 [LICENSE](https://github.com/FileUni/FileUni-Project/blob/main/LICENSE)를 참조하세요.
 
 사용, 라이선스 또는 협업 관련 문의: `contact@fileuni.com`.

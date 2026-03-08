@@ -39,9 +39,6 @@ Questo repository contiene il layer pubblico del progetto FileUni. Altri moduli 
 
 Il codice pubblicato è destinato a lettura, revisione, automazione delle release e visibilità di sicurezza o audit.
 
-## Restrizioni d'uso
-
-- L'uso commerciale non è consentito
-- Non è consentito creare o distribuire prodotti concorrenti basati su FileUni
+Per i termini di utilizzo del codice sorgente e della licenza, consulta direttamente [LICENSE](https://github.com/FileUni/FileUni-Project/blob/main/LICENSE).
 
 Per domande su utilizzo, licenza o collaborazione, contatta: `contact@fileuni.com`.

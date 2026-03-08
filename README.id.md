@@ -39,9 +39,6 @@ Repositori ini berisi lapisan proyek publik dari FileUni. Modul tambahan dapat d
 
 Source yang dipublikasikan ditujukan untuk dibaca, direview, otomatisasi release, dan visibilitas keamanan atau audit.
 
-## Batasan penggunaan
-
-- Penggunaan komersial tidak diizinkan
-- Membangun atau mendistribusikan produk pesaing berbasis FileUni tidak diizinkan
+Untuk syarat penggunaan source code dan lisensi, lihat langsung [LICENSE](https://github.com/FileUni/FileUni-Project/blob/main/LICENSE).
 
 Untuk pertanyaan tentang penggunaan, lisensi, atau kolaborasi, hubungi: `contact@fileuni.com`.
