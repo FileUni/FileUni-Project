@@ -57,14 +57,14 @@ jobs:
       - name: Push FileUni subtrees
         working-directory: workspace
         env:
-          FILEUNI_PROJECT_TRIGGER_TOKEN: ${{ secrets.FILEUNI_PROJECT_TRIGGER_TOKEN }}
+          FILEUNI_WORKSPACE_PAT: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
         shell: bash
         run: |
           set -euo pipefail
 
-          trigger_token="${FILEUNI_PROJECT_TRIGGER_TOKEN:-}"
-          if [ -z "${trigger_token}" ]; then
-            echo "::error::missing FILEUNI_PROJECT_TRIGGER_TOKEN"
+          workspace_token="${FILEUNI_WORKSPACE_PAT:-}"
+          if [ -z "${workspace_token}" ]; then
+            echo "::error::missing FILEUNI_WORKSPACE_PAT"
             exit 1
           fi
 
@@ -75,7 +75,7 @@ jobs:
             echo "::group::subtree push ${prefix} -> ${repo}"
             git subtree push \
               --prefix="${prefix}" \
-              "https://x-access-token:${trigger_token}@github.com/${repo}.git" \
+              "https://x-access-token:${workspace_token}@github.com/${repo}.git" \
               main
             echo "::endgroup::"
           }
