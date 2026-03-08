@@ -120,7 +120,7 @@ fileuni_cli_base() {
       fileuni_build_base "cli" "${arch}" "$(fileuni_detect_os_default "${target}")" "$(fileuni_detect_libc_default "${target}")"
       ;;
     android)
-      fileuni_build_base "cli" "${arch}" "android" "android"
+      fileuni_build_base "cli" "${arch}" "android" "cli"
       ;;
     freebsd)
       fileuni_build_base "cli" "${arch}" "freebsd" "freebsd"
@@ -150,7 +150,10 @@ fileuni_gui_base() {
       fileuni_build_base "gui" "${arch}" "windows" "msvc"
       ;;
     android)
-      fileuni_build_base "gui" "${arch}" "android" "android"
+      fileuni_build_base "gui" "${arch}" "android" "app"
+      ;;
+    ios-app)
+      fileuni_build_base "gui" "${arch}" "ios" "app"
       ;;
     *)
       printf 'Unknown gui base variant: %s\n' "${variant}" >&2

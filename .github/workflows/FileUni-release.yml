@@ -385,7 +385,7 @@ jobs:
           fi
           cargo build --release --package fileuni --target "${{ matrix.target }}"
 
-      - name: Create fallback artifact when distrib is empty
+      - name: Package plain binary artifacts
         shell: bash
         run: |
           zip_one() {
@@ -402,15 +402,12 @@ jobs:
             python -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
           }
 
-          shopt -s nullglob
-          files=(workspace/target/distrib/*)
-          if [ ${#files[@]} -gt 0 ]; then
-            exit 0
-          fi
-
           target="${{ matrix.target }}"
           if [[ "${target}" == *windows* ]]; then
-            bin="$(find workspace/target -type f -name 'fileuni.exe' | grep "${target}" | head -1 || true)"
+            bin="workspace/target/${target}/release/fileuni.exe"
+            if [ ! -f "${bin}" ]; then
+              bin="$(find workspace/target -type f -name 'fileuni.exe' | grep "${target}" | head -1 || true)"
+            fi
           else
             bin="workspace/target/${target}/release/fileuni"
             if [ ! -f "${bin}" ]; then
@@ -426,56 +423,12 @@ jobs:
           source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
           base="$(fileuni_cli_base "${target}" default)"
 
-          mkdir -p dist-fallback
+          mkdir -p dist-plain
           if [[ "${target}" == *windows* ]]; then
-            zip_one "dist-fallback/${base}.exe.zip" "${bin}"
+            zip_one "dist-plain/${base}.exe.zip" "${bin}"
           else
-            tar -cJf "dist-fallback/${base}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
-          fi
-
-      - name: Package raw binary zip
-        shell: bash
-        run: |
-          zip_one() {
-            out="$1"
-            input="$2"
-            if command -v zip >/dev/null 2>&1; then
-              zip -j "${out}" "${input}"
-              return
-            fi
-            if command -v python3 >/dev/null 2>&1; then
-              python3 -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
-              return
-            fi
-            python -c "import os,sys,zipfile; o,i=sys.argv[1],sys.argv[2]; z=zipfile.ZipFile(o,'w',zipfile.ZIP_DEFLATED); z.write(i, arcname=os.path.basename(i)); z.close()" "${out}" "${input}"
-          }
-
-          target="${{ matrix.target }}"
-          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
-          base="$(fileuni_cli_base "${target}" default)"
-
-          if [[ "${target}" == *windows* ]]; then
-            bin="workspace/target/${target}/release/fileuni.exe"
-            if [ ! -f "${bin}" ]; then
-              bin="$(find workspace/target -type f -name 'fileuni.exe' | grep "${target}" | head -1 || true)"
-            fi
-          else
-            bin="workspace/target/${target}/release/fileuni"
-            if [ ! -f "${bin}" ]; then
-              bin="$(find workspace/target -type f -name 'fileuni' | grep "${target}" | head -1 || true)"
-            fi
-          fi
-
-          if [ ! -f "${bin}" ]; then
-            echo "::error::No raw binary found for ${target}"
-            exit 1
-          fi
-
-          mkdir -p dist-raw
-          if [[ "${target}" == *windows* ]]; then
-            zip_one "dist-raw/${base}.exe.zip" "${bin}"
-          else
-            zip -j "dist-raw/${base}.zip" "${bin}"
+            zip -j "dist-plain/${base}.zip" "${bin}"
+            tar -cJf "dist-plain/${base}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
           fi
 
       - name: Create UPX raw binary zip
@@ -587,10 +540,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cli-${{ matrix.target }}
-          path: |
-            workspace/target/distrib/*
-            dist-fallback/*
-            dist-raw/*
+          path: dist-plain/*
 
   # ============================================================
   # Cross-compiled builds (Linux exotic)
@@ -763,7 +713,6 @@ jobs:
           fi
           mkdir -p dist
           zip -j "dist/${base}.zip" "${bin}"
-          tar -cJf "dist/${base}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
 
       - name: Create UPX-compressed copy
         if: github.event.inputs.enable_upx != 'false'
@@ -1139,6 +1088,9 @@ jobs:
         include: ${{ fromJSON(needs.resolve-matrix.outputs.gui_ios) }}
     runs-on: ${{ matrix.runner }}
     steps:
+      - name: Checkout community repo
+        uses: actions/checkout@v4
+
       - name: Checkout workspace
         uses: actions/checkout@v4
         with:
@@ -1279,6 +1231,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          target="${{ matrix.target }}"
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          base="$(fileuni_gui_base "${target}" ios-app)"
+
           ipa="$(find workspace/apps/gui -type f -name '*.ipa' | head -1 || true)"
           if [ -z "${ipa}" ] || [ ! -f "${ipa}" ]; then
             app="$(find workspace/apps/gui/gen/apple/build/Build/Products -type d -name '*.app' | head -1 || true)"
@@ -1300,7 +1256,7 @@ jobs:
           fi
 
           mkdir -p dist
-          cp "${ipa}" "dist/FileUni-gui-aarch64-ios-darwin.ipa"
+          cp "${ipa}" "dist/${base}.ipa"
 
       - name: Upload GUI iOS artifacts
         uses: actions/upload-artifact@v4

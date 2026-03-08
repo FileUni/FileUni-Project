@@ -83,7 +83,7 @@ If English isn't your first language, don't worry! We value your contributions r
 - [ ] DTO fields match `utoipa` schema descriptions
 - [ ] Extraction order: `(Method, Header, State, Path, Query, Json)`
 
-### Frontend (TypeScript/React)
+### Frontend (TypeScript/React/Astro)
 
 - [ ] **Zero `any` types** - Use `bun run gen-api` for auto-generated types
 - [ ] **Type check** - `bun run check` must pass with zero errors and warnings
