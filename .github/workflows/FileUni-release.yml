@@ -154,7 +154,7 @@ jobs:
           target_set="${target_set:-cli+gui}"
 
           # Strip JSONC comments and parse
-          sed 's|//.*||' community/.github/build_matrix.jsonc | jq -c '.' > /tmp/matrix.json
+          sed 's|//.*||' .github/build_matrix.jsonc | jq -c '.' > /tmp/matrix.json
 
           # Filter targets by mode for each build method
           cli_cargo_dist="$(jq -c --arg m "$mode" '[.cli["cargo-dist"][] | select(.mode | index($m))]' /tmp/matrix.json)"

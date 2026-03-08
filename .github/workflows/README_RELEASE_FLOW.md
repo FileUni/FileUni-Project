@@ -55,7 +55,7 @@ Important `workflow_dispatch` inputs:
 
 ## Build Coverage
 
-The exact matrix is resolved from `community/.github/build_matrix.jsonc`, but the workflow currently supports:
+The exact matrix is resolved from `.github/build_matrix.jsonc`, but the workflow currently supports:
 
 - CLI native and cross builds
 - CLI Android builds
