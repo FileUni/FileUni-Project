@@ -390,41 +390,8 @@ jobs:
             exit 1
           fi
 
-          arch_raw="${target%%-*}"
-          arch="${arch_raw}"
-          case "${arch_raw}" in
-            x86_64) arch="amd64" ;;
-            aarch64|arm64) arch="aarch64" ;;
-          esac
-          if [[ "${target}" == *windows* ]]; then
-            os="windows"
-          elif [[ "${target}" == *apple-darwin* ]]; then
-            os="macos"
-          elif [[ "${target}" == *linux-android* ]]; then
-            os="android"
-          elif [[ "${target}" == *freebsd* ]]; then
-            os="freebsd"
-          elif [[ "${target}" == *linux* ]]; then
-            os="linux"
-          else
-            os="unknown"
-          fi
-          if [[ "${target}" == *musl* ]]; then
-            libc="musl"
-          elif [[ "${target}" == *gnu* ]]; then
-            libc="gnu"
-          elif [[ "${target}" == *msvc* ]]; then
-            libc="msvc"
-          elif [[ "${target}" == *darwin* ]]; then
-            libc="darwin"
-          elif [[ "${target}" == *android* ]]; then
-            libc="android"
-          elif [[ "${target}" == *freebsd* ]]; then
-            libc="freebsd"
-          else
-            libc="native"
-          fi
-          base="FileUni-cli-${arch}-${os}-${libc}"
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          base="$(fileuni_cli_base "${target}" default)"
 
           mkdir -p dist-fallback
           if [[ "${target}" == *windows* ]]; then
@@ -451,41 +418,8 @@ jobs:
           }
 
           target="${{ matrix.target }}"
-          arch_raw="${target%%-*}"
-          arch="${arch_raw}"
-          case "${arch_raw}" in
-            x86_64) arch="amd64" ;;
-            aarch64|arm64) arch="aarch64" ;;
-          esac
-          if [[ "${target}" == *windows* ]]; then
-            os="windows"
-          elif [[ "${target}" == *apple-darwin* ]]; then
-            os="macos"
-          elif [[ "${target}" == *linux-android* ]]; then
-            os="android"
-          elif [[ "${target}" == *freebsd* ]]; then
-            os="freebsd"
-          elif [[ "${target}" == *linux* ]]; then
-            os="linux"
-          else
-            os="unknown"
-          fi
-          if [[ "${target}" == *musl* ]]; then
-            libc="musl"
-          elif [[ "${target}" == *gnu* ]]; then
-            libc="gnu"
-          elif [[ "${target}" == *msvc* ]]; then
-            libc="msvc"
-          elif [[ "${target}" == *darwin* ]]; then
-            libc="darwin"
-          elif [[ "${target}" == *android* ]]; then
-            libc="android"
-          elif [[ "${target}" == *freebsd* ]]; then
-            libc="freebsd"
-          else
-            libc="native"
-          fi
-          base="FileUni-cli-${arch}-${os}-${libc}"
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          base="$(fileuni_cli_base "${target}" default)"
 
           if [[ "${target}" == *windows* ]]; then
             bin="workspace/target/${target}/release/fileuni.exe"
@@ -530,41 +464,8 @@ jobs:
           }
 
           target="${{ matrix.target }}"
-          arch_raw="${target%%-*}"
-          arch="${arch_raw}"
-          case "${arch_raw}" in
-            x86_64) arch="amd64" ;;
-            aarch64|arm64) arch="aarch64" ;;
-          esac
-          if [[ "${target}" == *windows* ]]; then
-            os="windows"
-          elif [[ "${target}" == *apple-darwin* ]]; then
-            os="macos"
-          elif [[ "${target}" == *linux-android* ]]; then
-            os="android"
-          elif [[ "${target}" == *freebsd* ]]; then
-            os="freebsd"
-          elif [[ "${target}" == *linux* ]]; then
-            os="linux"
-          else
-            os="unknown"
-          fi
-          if [[ "${target}" == *musl* ]]; then
-            libc="musl"
-          elif [[ "${target}" == *gnu* ]]; then
-            libc="gnu"
-          elif [[ "${target}" == *msvc* ]]; then
-            libc="msvc"
-          elif [[ "${target}" == *darwin* ]]; then
-            libc="darwin"
-          elif [[ "${target}" == *android* ]]; then
-            libc="android"
-          elif [[ "${target}" == *freebsd* ]]; then
-            libc="freebsd"
-          else
-            libc="native"
-          fi
-          base="FileUni-cli-${arch}-${os}-${libc}"
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          base="$(fileuni_cli_base "${target}" default)"
 
           if [[ "${target}" == *windows* ]]; then
             bin="workspace/target/${target}/release/fileuni.exe"
@@ -708,41 +609,8 @@ jobs:
       - name: Package binary
         run: |
           target="${{ matrix.target }}"
-          arch_raw="${target%%-*}"
-          arch="${arch_raw}"
-          case "${arch_raw}" in
-            x86_64) arch="amd64" ;;
-            aarch64|arm64) arch="aarch64" ;;
-          esac
-          if [[ "${target}" == *windows* ]]; then
-            os="windows"
-          elif [[ "${target}" == *apple-darwin* ]]; then
-            os="macos"
-          elif [[ "${target}" == *linux-android* ]]; then
-            os="android"
-          elif [[ "${target}" == *freebsd* ]]; then
-            os="freebsd"
-          elif [[ "${target}" == *linux* ]]; then
-            os="linux"
-          else
-            os="unknown"
-          fi
-          if [[ "${target}" == *musl* ]]; then
-            libc="musl"
-          elif [[ "${target}" == *gnu* ]]; then
-            libc="gnu"
-          elif [[ "${target}" == *msvc* ]]; then
-            libc="msvc"
-          elif [[ "${target}" == *darwin* ]]; then
-            libc="darwin"
-          elif [[ "${target}" == *android* ]]; then
-            libc="android"
-          elif [[ "${target}" == *freebsd* ]]; then
-            libc="freebsd"
-          else
-            libc="native"
-          fi
-          base="FileUni-cli-${arch}-${os}-${libc}"
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          base="$(fileuni_cli_base "${target}" default)"
 
           bin="workspace/target/${target}/release/fileuni"
           if [ ! -f "${bin}" ]; then
@@ -760,41 +628,8 @@ jobs:
         if: github.event.inputs.enable_upx != 'false' && !contains(matrix.target, 'riscv64')
         run: |
           target="${{ matrix.target }}"
-          arch_raw="${target%%-*}"
-          arch="${arch_raw}"
-          case "${arch_raw}" in
-            x86_64) arch="amd64" ;;
-            aarch64|arm64) arch="aarch64" ;;
-          esac
-          if [[ "${target}" == *windows* ]]; then
-            os="windows"
-          elif [[ "${target}" == *apple-darwin* ]]; then
-            os="macos"
-          elif [[ "${target}" == *linux-android* ]]; then
-            os="android"
-          elif [[ "${target}" == *freebsd* ]]; then
-            os="freebsd"
-          elif [[ "${target}" == *linux* ]]; then
-            os="linux"
-          else
-            os="unknown"
-          fi
-          if [[ "${target}" == *musl* ]]; then
-            libc="musl"
-          elif [[ "${target}" == *gnu* ]]; then
-            libc="gnu"
-          elif [[ "${target}" == *msvc* ]]; then
-            libc="msvc"
-          elif [[ "${target}" == *darwin* ]]; then
-            libc="darwin"
-          elif [[ "${target}" == *android* ]]; then
-            libc="android"
-          elif [[ "${target}" == *freebsd* ]]; then
-            libc="freebsd"
-          else
-            libc="native"
-          fi
-          base="FileUni-cli-${arch}-${os}-${libc}"
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          base="$(fileuni_cli_base "${target}" default)"
 
           bin="workspace/target/${target}/release/fileuni"
           if [ ! -f "${bin}" ]; then
@@ -878,15 +713,8 @@ jobs:
       - name: Package binary
         run: |
           target="${{ matrix.target }}"
-          arch_raw="${target%%-*}"
-          arch="${arch_raw}"
-          case "${arch_raw}" in
-            x86_64) arch="amd64" ;;
-            aarch64|arm64) arch="aarch64" ;;
-          esac
-          os="android"
-          libc="android"
-          base="FileUni-cli-${arch}-${os}-${libc}"
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          base="$(fileuni_cli_base "${target}" android)"
 
           bin="$(find workspace/target -path "*/release/fileuni" | grep "${target}" | head -1 || true)"
           if [ -z "${bin}" ]; then
@@ -902,13 +730,8 @@ jobs:
         if: github.event.inputs.enable_upx != 'false'
         run: |
           target="${{ matrix.target }}"
-          arch_raw="${target%%-*}"
-          arch="${arch_raw}"
-          case "${arch_raw}" in
-            x86_64) arch="amd64" ;;
-            aarch64|arm64) arch="aarch64" ;;
-          esac
-          base="FileUni-cli-${arch}-android-android"
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          base="$(fileuni_cli_base "${target}" android)"
 
           bin="$(find workspace/target -path "*/release/fileuni" | grep "${target}" | head -1 || true)"
           if [ -z "${bin}" ] || [ ! -f "${bin}" ]; then
@@ -1048,33 +871,8 @@ jobs:
 
           mkdir -p dist
           target="${{ matrix.target }}"
-          arch_raw="${target%%-*}"
-          arch="${arch_raw}"
-          case "${arch_raw}" in
-            x86_64) arch="amd64" ;;
-            aarch64|arm64) arch="aarch64" ;;
-          esac
-          if [[ "${target}" == *windows* ]]; then
-            os="windows"
-          elif [[ "${target}" == *apple-darwin* ]]; then
-            os="macos"
-          elif [[ "${target}" == *linux* ]]; then
-            os="linux"
-          else
-            os="unknown"
-          fi
-          if [[ "${target}" == *musl* ]]; then
-            libc="musl"
-          elif [[ "${target}" == *gnu* ]]; then
-            libc="gnu"
-          elif [[ "${target}" == *msvc* ]]; then
-            libc="msvc"
-          elif [[ "${target}" == *darwin* ]]; then
-            libc="darwin"
-          else
-            libc="native"
-          fi
-          base="FileUni-gui-${arch}-${os}-${libc}"
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          base="$(fileuni_gui_base "${target}" default)"
 
           if [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ]; then
             file="workspace/target/${{ matrix.target }}/release/fileuni-gui.exe"
@@ -1121,13 +919,8 @@ jobs:
           }
 
           target="${{ matrix.target }}"
-          arch_raw="${target%%-*}"
-          arch="${arch_raw}"
-          case "${arch_raw}" in
-            x86_64) arch="amd64" ;;
-            aarch64|arm64) arch="aarch64" ;;
-          esac
-          base="FileUni-gui-${arch}-windows-msvc"
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          base="$(fileuni_gui_base "${target}" windows-msvc)"
 
           src="workspace/target/${target}/release/fileuni-gui.exe"
           if [ ! -f "${src}" ]; then
@@ -1271,13 +1064,8 @@ jobs:
         shell: bash
         run: |
           target="${{ matrix.target }}"
-          arch_raw="${target%%-*}"
-          arch="${arch_raw}"
-          case "${arch_raw}" in
-            x86_64) arch="amd64" ;;
-            aarch64|arm64) arch="aarch64" ;;
-          esac
-          base="FileUni-gui-${arch}-android-android"
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          base="$(fileuni_gui_base "${target}" android)"
 
           apk="$(find workspace/apps/gui -type f -name '*.apk' | grep -E '(release|unsigned)' | head -1 || true)"
           if [ -z "${apk}" ] || [ ! -f "${apk}" ]; then
@@ -1530,13 +1318,8 @@ jobs:
       - name: Package binary
         run: |
           target="${{ matrix.target }}"
-          arch_raw="${target%%-*}"
-          arch="${arch_raw}"
-          case "${arch_raw}" in
-            x86_64) arch="amd64" ;;
-            aarch64|arm64) arch="aarch64" ;;
-          esac
-          base="FileUni-cli-${arch}-freebsd-freebsd"
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          base="$(fileuni_cli_base "${target}" freebsd)"
 
           bin="workspace/target/release/fileuni"
           if [ ! -f "${bin}" ]; then
@@ -1551,13 +1334,8 @@ jobs:
         if: github.event.inputs.enable_upx != 'false' && !contains(matrix.target, 'freebsd')
         run: |
           target="${{ matrix.target }}"
-          arch_raw="${target%%-*}"
-          arch="${arch_raw}"
-          case "${arch_raw}" in
-            x86_64) arch="amd64" ;;
-            aarch64|arm64) arch="aarch64" ;;
-          esac
-          base="FileUni-cli-${arch}-freebsd-freebsd"
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          base="$(fileuni_cli_base "${target}" freebsd)"
 
           upx_bin="workspace/target/release/fileuni-upx"
           if [ ! -f "${upx_bin}" ]; then
@@ -1662,21 +1440,8 @@ jobs:
           mkdir -p packages
           target="${{ matrix.target }}"
 
-          arch_raw="${target%%-*}"
-          arch="${arch_raw}"
-          case "${arch_raw}" in
-            x86_64) arch="amd64" ;;
-            aarch64|arm64) arch="aarch64" ;;
-          esac
-          os="linux"
-          if [[ "${target}" == *musl* ]]; then
-            libc="musl"
-          elif [[ "${target}" == *gnu* ]]; then
-            libc="gnu"
-          else
-            libc="linux"
-          fi
-          base="FileUni-cli-${arch}-${os}-${libc}"
+          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          base="$(fileuni_cli_base "${target}" linux-packages)"
 
           for fmt in deb rpm apk archlinux ipk; do
             nfpm package --packager "${fmt}" --config nfpm.yaml --target "packages/" 2>&1 || echo "::warning::${fmt} packaging failed for ${target}"
