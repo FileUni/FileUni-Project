@@ -1369,10 +1369,10 @@ jobs:
           xcode_dev_dir="$(xcode-select -p)"
           default_toolchain="${xcode_dev_dir}/Toolchains/XcodeDefault.xctoolchain"
           ci_xcconfig="/tmp/fileuni-ios-ci.xcconfig"
-          cat > "${ci_xcconfig}" <<XCCONFIG
+          swift_lib_paths="${default_toolchain}/usr/lib/swift/iphoneos ${default_toolchain}/usr/lib/swift-5.0/iphoneos"
+          swift_ldflags="-L${default_toolchain}/usr/lib/swift/iphoneos -L${default_toolchain}/usr/lib/swift-5.0/iphoneos"
+          cat > "${ci_xcconfig}" <<'XCCONFIG'
           TOOLCHAINS = com.apple.dt.toolchain.XcodeDefault
-          LIBRARY_SEARCH_PATHS = ${default_toolchain}/usr/lib/swift/\$(PLATFORM_NAME) ${default_toolchain}/usr/lib/swift-5.0/\$(PLATFORM_NAME)
-          OTHER_LDFLAGS = \$(inherited) -L${default_toolchain}/usr/lib/swift/\$(PLATFORM_NAME) -L${default_toolchain}/usr/lib/swift-5.0/\$(PLATFORM_NAME)
           XCCONFIG
 
           # Force generated Xcode project to unsigned mode.
@@ -1401,6 +1401,8 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="" \
             PROVISIONING_PROFILE="" \
             XCODE_XCCONFIG_FILE="${ci_xcconfig}" \
+            LIBRARY_SEARCH_PATHS="${swift_lib_paths}" \
+            OTHER_LDFLAGS="${swift_ldflags}" \
             TOOLCHAINS="com.apple.dt.toolchain.XcodeDefault" \
             TOOLCHAIN_DIR="${default_toolchain}" \
             cargo tauri ios build --ci --target "${tauri_target}" --config tauri.ios.conf.json --no-sign | tee /tmp/xcodebuild-ios.log
@@ -1416,6 +1418,8 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="" \
             PROVISIONING_PROFILE="" \
             XCODE_XCCONFIG_FILE="${ci_xcconfig}" \
+            LIBRARY_SEARCH_PATHS="${swift_lib_paths}" \
+            OTHER_LDFLAGS="${swift_ldflags}" \
             TOOLCHAINS="com.apple.dt.toolchain.XcodeDefault" \
             TOOLCHAIN_DIR="${default_toolchain}" \
             cargo tauri ios build --ci --target "${tauri_target}" --config tauri.ios.conf.json | tee /tmp/xcodebuild-ios.log
