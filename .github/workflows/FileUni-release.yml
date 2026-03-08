@@ -315,6 +315,9 @@ jobs:
         include: ${{ fromJSON(needs.resolve-matrix.outputs.cli_cargo_dist) }}
     runs-on: ${{ matrix.runner }}
     steps:
+      - name: Checkout community repo
+        uses: actions/checkout@v4
+
       - name: Checkout workspace
         uses: actions/checkout@v4
         with:
@@ -420,7 +423,7 @@ jobs:
             exit 1
           fi
 
-          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          source "${{ github.workspace }}/community/.github/scripts/arch-helpers.sh"
           base="$(fileuni_cli_base "${target}" default)"
 
           mkdir -p dist-fallback
@@ -448,7 +451,7 @@ jobs:
           }
 
           target="${{ matrix.target }}"
-          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          source "${{ github.workspace }}/community/.github/scripts/arch-helpers.sh"
           base="$(fileuni_cli_base "${target}" default)"
 
           if [[ "${target}" == *windows* ]]; then
@@ -494,7 +497,7 @@ jobs:
           }
 
           target="${{ matrix.target }}"
-          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          source "${{ github.workspace }}/community/.github/scripts/arch-helpers.sh"
           base="$(fileuni_cli_base "${target}" default)"
 
           if [[ "${target}" == *windows* ]]; then
@@ -601,6 +604,9 @@ jobs:
         include: ${{ fromJSON(needs.resolve-matrix.outputs.cli_cross) }}
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout community repo
+        uses: actions/checkout@v4
+
       - name: Checkout workspace
         uses: actions/checkout@v4
         with:
@@ -639,7 +645,7 @@ jobs:
       - name: Package binary
         run: |
           target="${{ matrix.target }}"
-          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          source "${{ github.workspace }}/community/.github/scripts/arch-helpers.sh"
           base="$(fileuni_cli_base "${target}" default)"
 
           bin="workspace/target/${target}/release/fileuni"
@@ -658,7 +664,7 @@ jobs:
         if: github.event.inputs.enable_upx != 'false' && !contains(matrix.target, 'riscv64')
         run: |
           target="${{ matrix.target }}"
-          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          source "${{ github.workspace }}/community/.github/scripts/arch-helpers.sh"
           base="$(fileuni_cli_base "${target}" default)"
 
           bin="workspace/target/${target}/release/fileuni"
@@ -702,6 +708,9 @@ jobs:
         include: ${{ fromJSON(needs.resolve-matrix.outputs.cli_android) }}
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout community repo
+        uses: actions/checkout@v4
+
       - name: Checkout workspace
         uses: actions/checkout@v4
         with:
@@ -743,7 +752,7 @@ jobs:
       - name: Package binary
         run: |
           target="${{ matrix.target }}"
-          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          source "${{ github.workspace }}/community/.github/scripts/arch-helpers.sh"
           base="$(fileuni_cli_base "${target}" android)"
 
           bin="$(find workspace/target -path "*/release/fileuni" | grep "${target}" | head -1 || true)"
@@ -760,7 +769,7 @@ jobs:
         if: github.event.inputs.enable_upx != 'false'
         run: |
           target="${{ matrix.target }}"
-          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          source "${{ github.workspace }}/community/.github/scripts/arch-helpers.sh"
           base="$(fileuni_cli_base "${target}" android)"
 
           bin="$(find workspace/target -path "*/release/fileuni" | grep "${target}" | head -1 || true)"
@@ -805,6 +814,9 @@ jobs:
         include: ${{ fromJSON(needs.resolve-matrix.outputs.gui_tauri) }}
     runs-on: ${{ matrix.runner }}
     steps:
+      - name: Checkout community repo
+        uses: actions/checkout@v4
+
       - name: Checkout workspace
         uses: actions/checkout@v4
         with:
@@ -901,7 +913,7 @@ jobs:
 
           mkdir -p dist
           target="${{ matrix.target }}"
-          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          source "${{ github.workspace }}/community/.github/scripts/arch-helpers.sh"
           base="$(fileuni_gui_base "${target}" default)"
 
           if [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ]; then
@@ -949,7 +961,7 @@ jobs:
           }
 
           target="${{ matrix.target }}"
-          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          source "${{ github.workspace }}/community/.github/scripts/arch-helpers.sh"
           base="$(fileuni_gui_base "${target}" windows-msvc)"
 
           src="workspace/target/${target}/release/fileuni-gui.exe"
@@ -1020,6 +1032,9 @@ jobs:
         include: ${{ fromJSON(needs.resolve-matrix.outputs.gui_android) }}
     runs-on: ${{ matrix.runner }}
     steps:
+      - name: Checkout community repo
+        uses: actions/checkout@v4
+
       - name: Checkout workspace
         uses: actions/checkout@v4
         with:
@@ -1094,7 +1109,7 @@ jobs:
         shell: bash
         run: |
           target="${{ matrix.target }}"
-          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          source "${{ github.workspace }}/community/.github/scripts/arch-helpers.sh"
           base="$(fileuni_gui_base "${target}" android)"
 
           apk="$(find workspace/apps/gui -type f -name '*.apk' | grep -E '(release|unsigned)' | head -1 || true)"
@@ -1315,6 +1330,9 @@ jobs:
         include: ${{ fromJSON(needs.resolve-matrix.outputs.cli_vmactions) }}
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout community repo
+        uses: actions/checkout@v4
+
       - name: Checkout workspace
         uses: actions/checkout@v4
         with:
@@ -1348,7 +1366,7 @@ jobs:
       - name: Package binary
         run: |
           target="${{ matrix.target }}"
-          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          source "${{ github.workspace }}/community/.github/scripts/arch-helpers.sh"
           base="$(fileuni_cli_base "${target}" freebsd)"
 
           bin="workspace/target/release/fileuni"
@@ -1364,7 +1382,7 @@ jobs:
         if: github.event.inputs.enable_upx != 'false' && !contains(matrix.target, 'freebsd')
         run: |
           target="${{ matrix.target }}"
-          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          source "${{ github.workspace }}/community/.github/scripts/arch-helpers.sh"
           base="$(fileuni_cli_base "${target}" freebsd)"
 
           upx_bin="workspace/target/release/fileuni-upx"
@@ -1406,6 +1424,9 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.resolve-matrix.outputs.cli_nfpm) }}
     steps:
+      - name: Checkout community repo
+        uses: actions/checkout@v4
+
       - name: Download binary artifact
         uses: actions/download-artifact@v4
         with:
@@ -1470,7 +1491,7 @@ jobs:
           mkdir -p packages
           target="${{ matrix.target }}"
 
-          source "${{ github.workspace }}/.github/scripts/arch-helpers.sh"
+          source "${{ github.workspace }}/community/.github/scripts/arch-helpers.sh"
           base="$(fileuni_cli_base "${target}" linux-packages)"
 
           for fmt in deb rpm apk archlinux ipk; do
