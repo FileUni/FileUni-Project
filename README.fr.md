@@ -44,4 +44,4 @@ Le code publié est destiné à la lecture, à la revue, à l'automatisation des
 - L'usage commercial n'est pas autorisé
 - Il est interdit de créer ou distribuer des produits concurrents basés sur FileUni
 
-Pour toute question sur l'usage, la licence ou la collaboration, veuillez ouvrir une issue dans ce dépôt.
+Pour toute question sur l'usage, la licence ou la collaboration, contactez : `contact@fileuni.com`.

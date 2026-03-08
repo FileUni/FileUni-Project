@@ -44,4 +44,4 @@ Il codice pubblicato è destinato a lettura, revisione, automazione delle releas
 - L'uso commerciale non è consentito
 - Non è consentito creare o distribuire prodotti concorrenti basati su FileUni
 
-Per domande su utilizzo, licenza o collaborazione, apri una Issue in questo repository.
+Per domande su utilizzo, licenza o collaborazione, contatta: `contact@fileuni.com`.

@@ -44,4 +44,4 @@ Source yang dipublikasikan ditujukan untuk dibaca, direview, otomatisasi release
 - Penggunaan komersial tidak diizinkan
 - Membangun atau mendistribusikan produk pesaing berbasis FileUni tidak diizinkan
 
-Untuk pertanyaan tentang penggunaan, lisensi, atau kolaborasi, silakan buka Issue di repositori ini.
+Untuk pertanyaan tentang penggunaan, lisensi, atau kolaborasi, hubungi: `contact@fileuni.com`.

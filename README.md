@@ -44,4 +44,4 @@ The published source is intended for reading, review, release automation, and se
 - Commercial use is not permitted
 - Building or distributing competing FileUni-based products is not permitted
 
-For usage, licensing, or collaboration questions, please open an Issue in this repository.
+For usage, licensing, or collaboration questions, contact email: `contact@fileuni.com`.
