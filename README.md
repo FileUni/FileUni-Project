@@ -1,27 +1,47 @@
-# FileUni
+[English](./README.md) | [简体中文](./README.zh-CN.md) | [Deutsch](./README.de.md) | [Français](./README.fr.md) | [Italiano](./README.it.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md) | [हिन्दी](./README.hi.md) | [Bahasa Indonesia](./README.id.md) | [Tiếng Việt](./README.vi.md) | [ไทย](./README.th.md)
 
-**FileUni** is a modern file management platform designed for efficiency and flexibility.
+# FileUni Project
 
-This repository serves as the public hub for:
-- Issue discussion and feedback
+**FileUni** is a next-generation storage and file management platform built with Rust for performance, security, and modular deployment.
+
+From ultra-light devices to full servers, FileUni is designed to provide NAS-style capabilities without requiring dedicated hardware, while keeping one scalable codebase across CLI, GUI, and web-facing components.
+
+## What This Repository Is
+
+This repository is the public project hub for FileUni. It is mainly used for:
+
 - Automated build and release workflows
+- Public issue tracking and feedback
+- Community-facing project coordination
+- Subtree-based downstream sync targets
 
-## Source Availability
+The main development workspace lives in the private monorepo and selected components are synchronized here for release and public collaboration.
 
-This repository contains only the publicly released portion of FileUni source code. More modules will be opened gradually over time.
+## Why FileUni
 
-The published source is provided for reading, review, and security/audit purposes.
+- High-performance Rust architecture
+- Modular design for different deployment sizes
+- NAS features without dedicated hardware
+- Multi-protocol access including FTP, SFTP, WebDAV, and S3
+- Storage-oriented reliability and security focus
 
 ## Related Repositories
 
-- [FileUni Repositories](https://github.com/FileUni?tab=repositories) - All public repositories
-- [OfficialSiteDocs](https://github.com/FileUni/OfficialSiteDocs) - Documentation site
-- [frontends](https://github.com/FileUni/frontends) - Frontend application
+- [FileUni Website](https://fileuni.com/)
+- [FileUni Repositories](https://github.com/FileUni?tab=repositories)
+- [OfficialSiteDocs](https://github.com/FileUni/OfficialSiteDocs)
+- [OfficialSitePrivate](https://github.com/FileUni/OfficialSitePrivate)
+- [yh-filemanager-vfs-storage-hub](https://github.com/FileUni/yh-filemanager-vfs-storage-hub)
+
+## Source Availability
+
+This repository contains the public project layer of FileUni. Additional modules may be opened gradually over time.
+
+The published source is intended for reading, review, release automation, and security or audit visibility.
 
 ## Usage Restrictions
 
-Please note:
 - Commercial use is not permitted
-- Building or distributing FileUni-based competing products is not permitted
+- Building or distributing competing FileUni-based products is not permitted
 
 For usage, licensing, or collaboration questions, please open an Issue in this repository.

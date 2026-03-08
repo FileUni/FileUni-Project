@@ -1,0 +1,47 @@
+[English](./README.md) | [简体中文](./README.zh-CN.md) | [Deutsch](./README.de.md) | [Français](./README.fr.md) | [Italiano](./README.it.md) | [日本語](./README.ja.md) | [한국어](./README.ko.md) | [हिन्दी](./README.hi.md) | [Bahasa Indonesia](./README.id.md) | [Tiếng Việt](./README.vi.md) | [ไทย](./README.th.md)
+
+# FileUni Project
+
+**FileUni** は、性能・セキュリティ・モジュール型デプロイを重視して Rust で構築された次世代のストレージおよびファイル管理プラットフォームです。
+
+超軽量デバイスから本格的なサーバーまで、専用ハードウェアなしで NAS のような機能を提供し、CLI、GUI、Web コンポーネント全体で単一の拡張可能なコードベースを維持します。
+
+## このリポジトリについて
+
+このリポジトリは FileUni の公開プロジェクトハブです。主な用途は次のとおりです。
+
+- 自動ビルドおよびリリースワークフロー
+- 公開 Issue とフィードバック管理
+- コミュニティ向けのプロジェクト調整
+- subtree ベースの同期先
+
+メインの開発ワークスペースはプライベートな monorepo にあり、一部コンポーネントがリリースと公開コラボレーションのためにここへ同期されます。
+
+## FileUni の特徴
+
+- Rust ベースの高性能アーキテクチャ
+- さまざまな導入規模に対応するモジュール設計
+- 専用ハードウェア不要の NAS 機能
+- FTP、SFTP、WebDAV、S3 を含むマルチプロトコルアクセス
+- ストレージ用途に特化した信頼性とセキュリティ重視
+
+## 関連リポジトリ
+
+- [FileUni Website](https://fileuni.com/)
+- [FileUni Repositories](https://github.com/FileUni?tab=repositories)
+- [OfficialSiteDocs](https://github.com/FileUni/OfficialSiteDocs)
+- [OfficialSitePrivate](https://github.com/FileUni/OfficialSitePrivate)
+- [yh-filemanager-vfs-storage-hub](https://github.com/FileUni/yh-filemanager-vfs-storage-hub)
+
+## ソース公開について
+
+このリポジトリには FileUni の公開プロジェクト層が含まれます。今後さらに多くのモジュールが段階的に公開される可能性があります。
+
+公開されたソースは、閲覧、レビュー、リリース自動化、およびセキュリティ・監査上の可視性のために提供されます。
+
+## 利用制限
+
+- 商用利用は許可されていません
+- FileUni をベースにした競合製品の構築または配布は禁止されています
+
+利用、ライセンス、協業に関する質問は、このリポジトリで Issue を作成してください。
