@@ -7,6 +7,9 @@ on:
         description: "Source ref in FileUni-WorkSpace (tag/branch/sha). Default: main"
         required: false
         default: "main"
+      release_name:
+        description: "Release name override. Leave empty to use trigger-mode default naming."
+        required: false
       build_mode:
         description: "Build mode: full (all configured platforms) or minimal (CLI musl + GUI x64 AppImage)"
         type: choice
@@ -34,6 +37,15 @@ on:
         type: boolean
         required: false
         default: true
+      trigger_mode:
+        description: "Release trigger mode controlling default release naming"
+        type: choice
+        options:
+          - manual
+          - tag
+          - nightly
+        required: false
+        default: "manual"
 
 permissions:
   contents: write
@@ -100,19 +112,37 @@ jobs:
         working-directory: workspace
         run: |
           ref="${{ steps.resolve-ref.outputs.ref }}"
+          trigger_mode="${{ github.event.inputs.trigger_mode }}"
+          release_name_input="${{ github.event.inputs.release_name }}"
           echo "workspace_ref=${ref}" >> "$GITHUB_OUTPUT"
 
           pkg_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fileuni") | .version')"
           echo "dist_tag=v${pkg_version}" >> "$GITHUB_OUTPUT"
           echo "pkg_version=${pkg_version}" >> "$GITHUB_OUTPUT"
 
-          if echo "${ref}" | grep -qE '^v[0-9]+\.[0-9]+'; then
-            release_tag="${ref}"
+          if [ -n "${release_name_input}" ]; then
+            release_tag="${release_name_input}"
           else
-            release_tag="Release_$(date -u '+%Y%m%d_%H%M%S')"
+            timestamp="$(TZ=Asia/Shanghai date '+%Y%m%d_%H%M%S')"
+            case "${trigger_mode:-manual}" in
+              tag)
+                case "${ref}" in
+                  fileuni-v*) release_tag="FileUni-${ref#fileuni-}" ;;
+                  v*) release_tag="FileUni-${ref}" ;;
+                  FileUni-*) release_tag="${ref}" ;;
+                  *) release_tag="FileUni-${ref}" ;;
+                esac
+                ;;
+              nightly)
+                release_tag="nightly_${timestamp}"
+                ;;
+              manual|*)
+                release_tag="manually_${timestamp}"
+                ;;
+            esac
           fi
           echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
-          echo "::notice::dist_tag=v${pkg_version}  release_tag=${release_tag}  ref=${ref}"
+          echo "::notice::dist_tag=v${pkg_version}  release_tag=${release_tag}  ref=${ref}  trigger_mode=${trigger_mode:-manual}"
 
       - name: Resolve build matrix
         id: matrix
