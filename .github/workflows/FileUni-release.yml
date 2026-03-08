@@ -66,6 +66,7 @@ jobs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
       dist_tag: ${{ steps.meta.outputs.dist_tag }}
       pkg_version: ${{ steps.meta.outputs.pkg_version }}
+      build_mode: ${{ steps.matrix.outputs.build_mode }}
       cli_cargo_dist: ${{ steps.matrix.outputs.cli_cargo_dist }}
       cli_cross: ${{ steps.matrix.outputs.cli_cross }}
       cli_android: ${{ steps.matrix.outputs.cli_android }}
@@ -200,6 +201,7 @@ jobs:
           echo "gui_tauri=${gui_tauri}" >> "$GITHUB_OUTPUT"
           echo "gui_android=${gui_android}" >> "$GITHUB_OUTPUT"
           echo "gui_ios=${gui_ios}" >> "$GITHUB_OUTPUT"
+          echo "build_mode=${mode}" >> "$GITHUB_OUTPUT"
           echo "has_cli=${has_cli}" >> "$GITHUB_OUTPUT"
           echo "has_gui=${has_gui}" >> "$GITHUB_OUTPUT"
 
@@ -1473,6 +1475,158 @@ jobs:
           name: packages-${{ matrix.target }}
           path: packages/*
 
+  publish-docker:
+    needs: [resolve-matrix, build-cli, build-cli-cross]
+    if: ${{
+      !cancelled() &&
+      needs.resolve-matrix.outputs.build_mode == 'full' &&
+      needs.resolve-matrix.outputs.has_cli == 'true' &&
+      (needs.resolve-matrix.outputs.has_cargo_dist != 'true' || needs.build-cli.result == 'success') &&
+      (needs.resolve-matrix.outputs.has_cross != 'true' || needs.build-cli-cross.result == 'success')
+      }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout community repo
+        uses: actions/checkout@v4
+
+      - name: Download Linux musl CLI artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/docker-artifacts
+
+      - name: Prepare container binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x .github/scripts/prepare-container-binaries.sh
+          .github/scripts/prepare-container-binaries.sh /tmp/docker-artifacts /tmp/docker-context/binaries
+          find /tmp/docker-context/binaries -maxdepth 2 -type f | sort
+
+      - name: Resolve Docker tags
+        id: docker-tags
+        shell: bash
+        env:
+          PKG_VERSION: ${{ needs.resolve-matrix.outputs.pkg_version }}
+          RELEASE_TAG: ${{ needs.resolve-matrix.outputs.release_tag }}
+          PRERELEASE: ${{ github.event.inputs.prerelease }}
+        run: |
+          set -euo pipefail
+          sanitize_tag() {
+            printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g'
+          }
+
+          version_tag="$(sanitize_tag "${PKG_VERSION}")"
+          release_tag="$(sanitize_tag "${RELEASE_TAG}")"
+
+          alpine_tags=$'fileuni/fileuni:'"${version_tag}"$'-alpine\nfileuni/fileuni:'"${release_tag}"$'-alpine'
+          debian_tags=$'fileuni/fileuni:'"${version_tag}"$'-debian\nfileuni/fileuni:'"${release_tag}"$'-debian'
+
+          if [ "${PRERELEASE}" != "true" ]; then
+            alpine_tags+=$'\nfileuni/fileuni:alpine'
+            debian_tags+=$'\nfileuni/fileuni:debian'
+          fi
+
+          {
+            echo "alpine<<EOF"
+            printf '%s\n' "${alpine_tags}"
+            echo "EOF"
+            echo "debian<<EOF"
+            printf '%s\n' "${debian_tags}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Setup QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: fileuni
+          password: ${{ secrets.DOCKER_KEY != '' && secrets.DOCKER_KEY || vars.DOCKER_KEY }}
+
+      - name: Build and push Alpine image
+        uses: docker/build-push-action@v6
+        with:
+          context: /tmp/docker-context
+          file: .github/docker/alpine.Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.docker-tags.outputs.alpine }}
+
+      - name: Build and push Debian deps image
+        uses: docker/build-push-action@v6
+        with:
+          context: /tmp/docker-context
+          file: .github/docker/debian-deps.Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: ${{ steps.docker-tags.outputs.debian }}
+
+  build-pve-ct-template:
+    needs: [resolve-matrix, build-cli]
+    if: ${{
+      !cancelled() &&
+      needs.resolve-matrix.outputs.build_mode == 'full' &&
+      needs.resolve-matrix.outputs.has_cli == 'true' &&
+      (needs.resolve-matrix.outputs.has_cargo_dist != 'true' || needs.build-cli.result == 'success')
+      }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout community repo
+        uses: actions/checkout@v4
+
+      - name: Download x86_64 musl CLI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: cli-x86_64-unknown-linux-musl
+          path: /tmp/ct-artifact
+
+      - name: Extract FileUni binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/ct-binary
+          archive="$(find /tmp/ct-artifact -type f -name '*.tar.xz' | head -1 || true)"
+          if [ -z "${archive}" ]; then
+            echo "::error::x86_64 musl archive not found for CT template"
+            find /tmp/ct-artifact -maxdepth 3 -type f | sort
+            exit 1
+          fi
+          tar -xJf "${archive}" -C /tmp/ct-binary
+          binary="$(find /tmp/ct-binary -type f -name 'fileuni' | head -1 || true)"
+          if [ -z "${binary}" ]; then
+            echo "::error::fileuni binary not found after extraction"
+            find /tmp/ct-binary -maxdepth 4 -type f | sort
+            exit 1
+          fi
+          install -Dm0755 "${binary}" /tmp/ct-binary/fileuni
+
+      - name: Install CT template dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq debootstrap zstd > /dev/null
+
+      - name: Build PVE CT template
+        shell: bash
+        env:
+          VERSION: ${{ needs.resolve-matrix.outputs.pkg_version }}
+        run: |
+          set -euo pipefail
+          chmod +x .github/scripts/build-pve-ct-template.sh
+          .github/scripts/build-pve-ct-template.sh "${VERSION}" /tmp/ct-binary/fileuni /tmp/ct-output
+          ls -lh /tmp/ct-output
+
+      - name: Upload CT template artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ct-template-x86_64
+          path: /tmp/ct-output/FileUni-cli-x86_64-linux-pve-ct-by-debian.tar.zst
+
   publish:
     needs:
       [
@@ -1485,6 +1639,8 @@ jobs:
         build-gui-android,
         build-gui-ios,
         package-linux,
+        publish-docker,
+        build-pve-ct-template,
       ]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     runs-on: ubuntu-latest
@@ -1502,7 +1658,7 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: "{cli-*,gui-*,packages-*}"
+          pattern: "{cli-*,gui-*,packages-*,ct-template-*}"
           path: /tmp/release
           merge-multiple: true
 
