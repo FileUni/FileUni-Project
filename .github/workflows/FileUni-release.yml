@@ -1372,6 +1372,7 @@ jobs:
           cat > "${ci_xcconfig}" <<XCCONFIG
           TOOLCHAINS = com.apple.dt.toolchain.XcodeDefault
           LIBRARY_SEARCH_PATHS = ${default_toolchain}/usr/lib/swift/\$(PLATFORM_NAME) ${default_toolchain}/usr/lib/swift-5.0/\$(PLATFORM_NAME)
+          OTHER_LDFLAGS = \$(inherited) -L${default_toolchain}/usr/lib/swift/\$(PLATFORM_NAME) -L${default_toolchain}/usr/lib/swift-5.0/\$(PLATFORM_NAME)
           XCCONFIG
 
           # Force generated Xcode project to unsigned mode.
