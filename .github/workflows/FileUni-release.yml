@@ -1347,6 +1347,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          cargo tauri -V
           rm -rf gen/apple
           cargo tauri ios init --ci
 
@@ -1438,6 +1439,7 @@ jobs:
       - name: Package iOS artifact
         shell: bash
         run: |
+          set -euo pipefail
           ipa="$(find workspace/apps/gui -type f -name '*.ipa' | head -1 || true)"
           if [ -z "${ipa}" ] || [ ! -f "${ipa}" ]; then
             app="$(find workspace/apps/gui/gen/apple/build/Build/Products -type d -name '*.app' | head -1 || true)"
@@ -1466,6 +1468,16 @@ jobs:
         with:
           name: gui-ios-${{ matrix.target }}
           path: dist/*
+
+      - name: Upload iOS build logs (always)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-logs-${{ matrix.target }}
+          path: |
+            /tmp/xcodebuild-ios.log
+            workspace/apps/gui/gen/apple/build/**/Logs/**
+          if-no-files-found: ignore
 
   # ============================================================
   # BSD builds via vmactions (FreeBSD native VM)
