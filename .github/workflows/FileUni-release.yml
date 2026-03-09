@@ -1520,6 +1520,17 @@ jobs:
             printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_.-]/-/g'
           }
 
+          is_stable_tag() {
+            case "$1" in
+              *alpha*|*beta*|*rc*|*test*|*demo*|*temp*|*tmp*|*manually*)
+                return 1
+                ;;
+              *)
+                return 0
+                ;;
+            esac
+          }
+
           version_tag="$(sanitize_tag "${PKG_VERSION}")"
           release_tag="$(sanitize_tag "${RELEASE_TAG}")"
 
@@ -1527,7 +1538,7 @@ jobs:
           alpine_upx_tags=$'fileuni/fileuni:'"${version_tag}"$'-alpine-upx\nfileuni/fileuni:'"${release_tag}"$'-alpine-upx'
           debian_tags=$'fileuni/fileuni:'"${version_tag}"$'-debian\nfileuni/fileuni:'"${release_tag}"$'-debian'
 
-          if [ "${PRERELEASE}" != "true" ]; then
+          if [ "${PRERELEASE}" != "true" ] && is_stable_tag "${version_tag}" && is_stable_tag "${release_tag}"; then
             alpine_tags+=$'\nfileuni/fileuni:alpine'
             alpine_upx_tags+=$'\nfileuni/fileuni:alpine-upx'
             debian_tags+=$'\nfileuni/fileuni:debian'
