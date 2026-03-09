@@ -431,7 +431,6 @@ jobs:
             zip_one "dist-plain/${base}.exe.zip" "${bin}"
           else
             zip -j "dist-plain/${base}.zip" "${bin}"
-            tar -cJf "dist-plain/${base}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
           fi
 
       - name: Create UPX raw binary zip
@@ -610,7 +609,6 @@ jobs:
             zip -j "dist/${base}.exe.zip" "${bin}"
           else
             zip -j "dist/${base}.zip" "${bin}"
-            tar -cJf "dist/${base}.tar.xz" -C "$(dirname "${bin}")" "$(basename "${bin}")"
           fi
 
       - name: Create UPX-compressed copy
@@ -1395,9 +1393,12 @@ jobs:
       - name: Extract binary
         run: |
           mkdir -p binary
-          file="$(find artifact -type f -name '*.tar.xz' | head -1)"
-          if [ -n "${file}" ]; then
-            tar -xJf "${file}" -C binary
+          file_zip="$(find artifact -type f -name '*.zip' | head -1 || true)"
+          file_tar="$(find artifact -type f -name '*.tar.xz' | head -1 || true)"
+          if [ -n "${file_zip}" ]; then
+            unzip -q "${file_zip}" -d binary
+          elif [ -n "${file_tar}" ]; then
+            tar -xJf "${file_tar}" -C binary
           else
             direct_bin="$(find artifact -type f -name fileuni | head -1)"
             if [ -n "${direct_bin}" ]; then
@@ -1620,13 +1621,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/ct-binary
-          archive="$(find /tmp/ct-artifact -type f -name '*.tar.xz' | head -1 || true)"
-          if [ -z "${archive}" ]; then
+          archive_zip="$(find /tmp/ct-artifact -type f -name '*.zip' | head -1 || true)"
+          archive_tar="$(find /tmp/ct-artifact -type f -name '*.tar.xz' | head -1 || true)"
+          if [ -n "${archive_zip}" ]; then
+            unzip -q "${archive_zip}" -d /tmp/ct-binary
+          elif [ -n "${archive_tar}" ]; then
+            tar -xJf "${archive_tar}" -C /tmp/ct-binary
+          else
             echo "::error::x86_64 musl archive not found for CT template"
             find /tmp/ct-artifact -maxdepth 3 -type f | sort
             exit 1
           fi
-          tar -xJf "${archive}" -C /tmp/ct-binary
           binary="$(find /tmp/ct-binary -type f -name 'fileuni' | head -1 || true)"
           if [ -z "${binary}" ]; then
             echo "::error::fileuni binary not found after extraction"
