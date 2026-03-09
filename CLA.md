@@ -46,9 +46,9 @@ You provide Your Contributions on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDIT
 
 In no event shall You be liable for any direct, indirect, incidental, special, exemplary, or consequential damages of any kind, including but not limited to procurement of substitute goods or services, loss of use, data, or profits, or business interruption, however caused and on any theory of liability, whether in contract, strict liability, or tort (including negligence or otherwise) arising in any way out of the use or distribution of Your Contribution.
 
-## 8. Governing Law and Dispute Resolution
+## 8. Dispute Resolution
 
-This Agreement shall be governed by and construed in accordance with applicable international commercial law principles. Any dispute arising out of or in connection with this Agreement shall be resolved through good faith negotiation. If negotiation fails, the dispute shall be settled by arbitration in accordance with the UNCITRAL Arbitration Rules. The place of arbitration shall be Singapore.
+Any dispute arising out of or in connection with this Agreement shall first be resolved through good faith discussion. We prefer amicable resolution and open communication.
 
 ## 9. Entire Agreement
 

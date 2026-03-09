@@ -147,6 +147,7 @@ jobs:
 
       - name: Resolve build matrix
         id: matrix
+        working-directory: community
         run: |
           mode="${{ github.event.inputs.build_mode }}"
           mode="${mode:-full}"
