@@ -15,8 +15,10 @@ RUN --mount=type=bind,source=binaries,target=/tmp/fileuni-binaries,ro set -eux; 
       iproute2 \
       iputils-ping \
       libvips-tools \
+      latexmk \
       net-tools \
       p7zip-full \
+      texlive-xetex \
       tzdata; \
     rm -rf /var/lib/apt/lists/*; \
     case "${TARGETARCH}${TARGETVARIANT:+/${TARGETVARIANT}}" in \
