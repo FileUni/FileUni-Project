@@ -161,6 +161,80 @@ def render_scoop_manifest(version: str, release_tag: str, checksums: dict[str, s
     return json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
 
 
+def hex_to_sri_sha256(hex_digest: str) -> str:
+    import base64
+
+    return "sha256-" + base64.b64encode(bytes.fromhex(hex_digest)).decode("ascii")
+
+
+def render_nix_package(version: str, release_tag: str, checksums: dict[str, str]) -> str:
+    systems = {
+        "x86_64-linux": {
+            "url": release_url(release_tag, asset_name_for_target("x86_64-unknown-linux-gnu")),
+            "hash": hex_to_sri_sha256(checksums["x86_64-unknown-linux-gnu"]),
+        },
+        "aarch64-linux": {
+            "url": release_url(release_tag, asset_name_for_target("aarch64-unknown-linux-gnu")),
+            "hash": hex_to_sri_sha256(checksums["aarch64-unknown-linux-gnu"]),
+        },
+        "x86_64-darwin": {
+            "url": release_url(release_tag, asset_name_for_target("x86_64-apple-darwin")),
+            "hash": hex_to_sri_sha256(checksums["x86_64-apple-darwin"]),
+        },
+        "aarch64-darwin": {
+            "url": release_url(release_tag, asset_name_for_target("aarch64-apple-darwin")),
+            "hash": hex_to_sri_sha256(checksums["aarch64-apple-darwin"]),
+        },
+    }
+
+    entries = []
+    for system, meta in systems.items():
+        entries.append(
+            f'    "{system}" = {{ url = "{meta["url"]}"; hash = "{meta["hash"]}"; }};'
+        )
+    sources_block = "\n".join(entries)
+
+    return f'''{{ lib, stdenvNoCC, fetchzip }}:
+
+let
+  pname = "fileuni";
+  version = "{version}";
+  sources = {{
+{sources_block}
+  }};
+  source = sources.${{stdenvNoCC.hostPlatform.system}}
+    or (throw "Unsupported system for FileUni: ${{stdenvNoCC.hostPlatform.system}}");
+in
+stdenvNoCC.mkDerivation {{
+  inherit pname version;
+
+  src = fetchzip {{
+    url = source.url;
+    hash = source.hash;
+    stripRoot = false;
+  }};
+
+  dontConfigure = true;
+  dontBuild = true;
+
+  installPhase = ''
+    runHook preInstall
+    install -Dm755 "$src/fileuni" "$out/bin/fileuni"
+    runHook postInstall
+  '';
+
+  meta = with lib; {{
+    description = "FileUni CLI";
+    homepage = "https://fileuni.com";
+    mainProgram = "fileuni";
+    license = licenses.unfree;
+    platforms = builtins.attrNames sources;
+    sourceProvenance = with sourceTypes; [ binaryNativeCode ];
+  }};
+}}
+'''
+
+
 def update_indexes(args: argparse.Namespace) -> int:
     workspace_root = Path(args.workspace_root).resolve()
     artifact_root = Path(args.artifact_root).resolve()
@@ -182,6 +256,10 @@ def update_indexes(args: argparse.Namespace) -> int:
     scoop_path = workspace_root / "ScoopFileUni" / "bucket" / "fileuni.json"
     scoop_path.parent.mkdir(parents=True, exist_ok=True)
     scoop_path.write_text(render_scoop_manifest(args.version, args.release_tag, checksums), encoding="utf-8")
+
+    nix_path = workspace_root / "NixPkgsFileUni" / "pkgs" / "fileuni-bin.nix"
+    nix_path.parent.mkdir(parents=True, exist_ok=True)
+    nix_path.write_text(render_nix_package(args.version, args.release_tag, checksums), encoding="utf-8")
     return 0
 
 

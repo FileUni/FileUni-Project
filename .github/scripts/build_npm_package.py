@@ -111,10 +111,13 @@ def build_package(args: argparse.Namespace) -> int:
         "version": args.version,
         "description": package_meta["description"],
         "license": "UNLICENSED",
-        "repository": "https://github.com/FileUni/FileUni-Project",
+        "repository": {
+            "type": "git",
+            "url": "https://github.com/FileUni/FileUni-Project",
+        },
         "homepage": "https://fileuni.com",
         "bugs": {
-            "url": "https://github.com/fileuni/FileUni-WorkSpace/issues",
+            "url": "https://github.com/FileUni/FileUni-WorkSpace/issues",
         },
         "files": [
             "bin",
