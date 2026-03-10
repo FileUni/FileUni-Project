@@ -1685,7 +1685,7 @@ jobs:
             --artifact-root /tmp/package-index-artifacts \
             --version "${PKG_VERSION}" \
             --release-tag "${RELEASE_TAG}"
-          git -C workspace diff -- HomebrewFileUni ScoopFileUni || true
+          git -C workspace diff -- HomebrewFileUni ScoopFileUni NixPkgsFileUni || true
 
       - name: Commit package index updates to workspace
         working-directory: workspace
@@ -1694,13 +1694,13 @@ jobs:
           FILEUNI_WORKSPACE_PAT: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
         run: |
           set -euo pipefail
-          if [ -z "$(git status --porcelain -- HomebrewFileUni ScoopFileUni)" ]; then
+          if [ -z "$(git status --porcelain -- HomebrewFileUni ScoopFileUni NixPkgsFileUni)" ]; then
             echo "No Homebrew/Scoop changes detected."
             exit 0
           fi
 
-          git add HomebrewFileUni ScoopFileUni
-          git commit -m "chore(release): update brew and scoop indexes for ${{ needs.resolve-matrix.outputs.pkg_version }}"
+          git add HomebrewFileUni ScoopFileUni NixPkgsFileUni
+          git commit -m "chore(release): update brew, scoop, and nix indexes for ${{ needs.resolve-matrix.outputs.pkg_version }}"
           git push "https://x-access-token:${FILEUNI_WORKSPACE_PAT}@github.com/${{ env.WORKSPACE_REPO }}.git" HEAD:main
 
   publish-npm:

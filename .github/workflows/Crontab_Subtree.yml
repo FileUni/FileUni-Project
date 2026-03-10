@@ -86,4 +86,5 @@ jobs:
           push_subtree "OfficialSitePrivate" "FileUni/OfficialSitePrivate"
           push_subtree "HomebrewFileUni" "FileUni/homebrew-fileuni"
           push_subtree "ScoopFileUni" "FileUni/scoop-fileuni"
+          push_subtree "NixPkgsFileUni" "FileUni/nixpkgs-fileuni"
           push_subtree "crates/yh-filemanager-vfs-storage-hub" "FileUni/yh-filemanager-vfs-storage-hub"
