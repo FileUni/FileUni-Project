@@ -1667,25 +1667,17 @@ jobs:
       needs.package-npm-platforms.result == 'success'
       }}
     runs-on: ubuntu-latest
-    env:
-      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - name: Checkout community repo
         uses: actions/checkout@v4
 
-      - name: Warn when npm token is missing
-        if: env.NODE_AUTH_TOKEN == ''
-        run: echo "::warning::NPM_TOKEN is empty, skipping npm publish."
-
       - name: Setup Node.js
-        if: env.NODE_AUTH_TOKEN != ''
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Download npm platform packages
-        if: env.NODE_AUTH_TOKEN != ''
         uses: actions/download-artifact@v4
         with:
           pattern: npm-package-*
@@ -1693,7 +1685,6 @@ jobs:
           merge-multiple: true
 
       - name: Publish platform packages to npm
-        if: env.NODE_AUTH_TOKEN != ''
         shell: bash
         run: |
           set -euo pipefail
@@ -1703,7 +1694,6 @@ jobs:
           done
 
       - name: Build npm root package
-        if: env.NODE_AUTH_TOKEN != ''
         shell: bash
         env:
           PKG_VERSION: ${{ needs.resolve-matrix.outputs.pkg_version }}
@@ -1719,7 +1709,6 @@ jobs:
           find /tmp/npm-root -maxdepth 3 -type f | sort
 
       - name: Publish root package to npm
-        if: env.NODE_AUTH_TOKEN != ''
         shell: bash
         run: |
           set -euo pipefail

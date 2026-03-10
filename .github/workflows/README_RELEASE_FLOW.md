@@ -5,7 +5,6 @@
 - Upstream trigger in WorkSpace: `.github/workflows/trigger-project-release.yml`
 - Downstream build/publish workflow in Project: `FileUni-release.yml`
 - Required secret in Project: `FILEUNI_WORKSPACE_PAT`
-- Optional publish secret in Project: `NPM_TOKEN`
 - npm packaging manifest: `.github/npm/npm-packages.json`
 - npm package builder: `.github/scripts/build_npm_packages.py`
 
@@ -75,7 +74,9 @@ The exact matrix is resolved from `.github/build_matrix.jsonc`, but the workflow
 
 - npm publish is enabled only when `build_mode=full`
 - npm publish requires CLI builds to be enabled
-- if `NPM_TOKEN` is empty, the workflow emits a warning and skips npm publish
+- npm publish uses npm Trusted Publisher with GitHub Actions OIDC
+- no `NPM_TOKEN` secret is required for npm publishing
+- the npm package settings must trust `FileUni/FileUni-Project` and the `FileUni-release.yml` workflow
 - platform packages are published before the root package, so `fileuni` never references unpublished platform versions
 - Linux publishes both `gnu` and `musl` variants
 - the root package prefers `gnu` first when both `gnu` and `musl` variants are present locally
