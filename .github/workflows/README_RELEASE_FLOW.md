@@ -5,8 +5,9 @@
 - Upstream trigger in WorkSpace: `.github/workflows/trigger-project-release.yml`
 - Downstream build/publish workflow in Project: `FileUni-release.yml`
 - Required secret in Project: `FILEUNI_WORKSPACE_PAT`
-- npm packaging manifest: `.github/npm/npm-packages.json`
-- npm package builder: `.github/scripts/build_npm_packages.py`
+- npm target manifest: `.github/npm/binary-targets.json`
+- npm package builder: `.github/scripts/build_npm_package.py`
+- npm package templates: `.github/npm/templates/`
 
 ## Trigger Sources
 
@@ -47,15 +48,15 @@ Important `workflow_dispatch` inputs:
 2. **build-frontends** — Build CLI and GUI frontend assets from WorkSpace
 3. **build-cli** — Build CLI artifacts across cargo-dist, cross, Android, BSD, and package formats
 4. **build-gui** — Build GUI artifacts across desktop Tauri, Android, and iOS paths
-5. **package-npm-platforms** — Convert CLI release artifacts into platform-specific npm packages
-6. **publish-npm** — Publish platform packages first, then publish the root `fileuni` npm package
-7. **publish** — Collect standardized `FileUni-*` artifacts, generate release notes, and publish the GitHub Release
+5. **publish** — Collect standardized `FileUni-*` artifacts, generate release notes, and publish the GitHub Release
+6. **publish-npm** — Build and publish the single `fileuni` npm package after the GitHub Release is available
 
 ## Artifact Naming
 
 - Final release assets are standardized as `FileUni-*`
 - Architecture, OS, and libc naming are centralized in `.github/scripts/arch-helpers.sh`
 - The publish step removes non-standard filenames before uploading release assets
+- The npm package downloads those same standardized GitHub Release assets during `postinstall`
 
 ## Build Coverage
 
@@ -65,7 +66,7 @@ The exact matrix is resolved from `.github/build_matrix.jsonc`, but the workflow
 - CLI Android builds
 - CLI FreeBSD builds
 - Linux package builds via nFPM
-- npm CLI packages for Linux `gnu` / `musl`, Windows, macOS, Android, and FreeBSD
+- npm single-package distribution for Linux `gnu` / `musl`, Windows, macOS, Android, and FreeBSD
 - GUI desktop Tauri builds
 - GUI Android APK builds
 - GUI iOS IPA packaging
@@ -74,18 +75,19 @@ The exact matrix is resolved from `.github/build_matrix.jsonc`, but the workflow
 
 - npm publish is enabled only when `build_mode=full`
 - npm publish requires CLI builds to be enabled
+- npm publish runs after the GitHub Release has been published, because the npm package downloads release assets by `release_tag`
 - npm publish uses npm Trusted Publisher with GitHub Actions OIDC
 - no `NPM_TOKEN` secret is required for npm publishing
 - the npm package settings must trust `FileUni/FileUni-Project` and the `FileUni-release.yml` workflow
-- platform packages are published before the root package, so `fileuni` never references unpublished platform versions
-- Linux publishes both `gnu` and `musl` variants
-- the root package prefers `gnu` first when both `gnu` and `musl` variants are present locally
+- only one npm package is published: `fileuni`
+- the package auto-detects the current platform during `postinstall`
+- Linux defaults to `gnu` when detection is ambiguous, and users can override with `FILEUNI_NPM_LIBC` or `FILEUNI_NPM_TARGET`
 
 ## npm Package Layout
 
-- Root package: `fileuni`
-- Platform packages: `@fileuni/fileuni-*`
-- Platform metadata, target mapping, `os` / `cpu` / `libc`, and package names are all defined in `.github/npm/npm-packages.json`
+- Package name: `fileuni`
+- Binary target metadata is defined in `.github/npm/binary-targets.json`
+- The generated package contains only JavaScript launcher/install files and downloads the real CLI binary from GitHub Releases on demand
 - This design is fully independent from `packages/`, so `packages/` can be removed later without affecting release publishing
 
 ## Notes
