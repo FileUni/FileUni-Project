@@ -29,11 +29,12 @@ Workspace phát triển chính nằm trong monorepo riêng tư và một số th
 
 ## Kho liên quan
 
-- [FileUni Website](https://fileuni.com/)
-- [FileUni Repositories](https://github.com/FileUni?tab=repositories)
-- [OfficialSiteDocs](https://github.com/FileUni/OfficialSiteDocs)
-- [OfficialSitePrivate](https://github.com/FileUni/OfficialSitePrivate)
-- [yh-filemanager-vfs-storage-hub](https://github.com/FileUni/yh-filemanager-vfs-storage-hub)
+- [OfficialSiteDocs](https://github.com/FileUni/OfficialSiteDocs) - Tài liệu
+- [frontends](https://github.com/FileUni/frontends) - Thành phần frontend
+- [yh-filemanager-vfs-storage-hub](https://github.com/FileUni/yh-filemanager-vfs-storage-hub) - Lõi VFS
+- [homebrew-fileuni](https://github.com/FileUni/homebrew-fileuni) - Homebrew tap
+- [scoop-fileuni](https://github.com/FileUni/scoop-fileuni) - Scoop bucket
+- [nixpkgs-fileuni](https://github.com/FileUni/nixpkgs-fileuni) - Gói Nix
 
 ## Phạm vi công khai mã nguồn
 

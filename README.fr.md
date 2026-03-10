@@ -29,11 +29,12 @@ L'espace principal de développement se trouve dans un monorepo privé, et certa
 
 ## Dépôts associés
 
-- [Site FileUni](https://fileuni.com/)
-- [Dépôts FileUni](https://github.com/FileUni?tab=repositories)
-- [OfficialSiteDocs](https://github.com/FileUni/OfficialSiteDocs)
-- [OfficialSitePrivate](https://github.com/FileUni/OfficialSitePrivate)
-- [yh-filemanager-vfs-storage-hub](https://github.com/FileUni/yh-filemanager-vfs-storage-hub)
+- [OfficialSiteDocs](https://github.com/FileUni/OfficialSiteDocs) - Documentation
+- [frontends](https://github.com/FileUni/frontends) - Composants frontend
+- [yh-filemanager-vfs-storage-hub](https://github.com/FileUni/yh-filemanager-vfs-storage-hub) - Noyau VFS
+- [homebrew-fileuni](https://github.com/FileUni/homebrew-fileuni) - Homebrew tap
+- [scoop-fileuni](https://github.com/FileUni/scoop-fileuni) - Scoop bucket
+- [nixpkgs-fileuni](https://github.com/FileUni/nixpkgs-fileuni) - Paquet Nix
 
 ## Disponibilité du code source
 

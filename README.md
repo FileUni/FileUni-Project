@@ -29,14 +29,12 @@ The main development workspace lives in the private monorepo and selected compon
 
 ## Related Repositories
 
-- [FileUni Website](https://fileuni.com/)
-- [FileUni Repositories](https://github.com/FileUni?tab=repositories)
-- [OfficialSiteDocs](https://github.com/FileUni/OfficialSiteDocs)
-- [OfficialSitePrivate](https://github.com/FileUni/OfficialSitePrivate)
-- [yh-filemanager-vfs-storage-hub](https://github.com/FileUni/yh-filemanager-vfs-storage-hub)
-- [homebrew-fileuni](https://github.com/FileUni/homebrew-fileuni)
-- [scoop-fileuni](https://github.com/FileUni/scoop-fileuni)
-- [nixpkgs-fileuni](https://github.com/FileUni/nixpkgs-fileuni)
+- [OfficialSiteDocs](https://github.com/FileUni/OfficialSiteDocs) - Documentation
+- [frontends](https://github.com/FileUni/frontends) - Frontend components
+- [yh-filemanager-vfs-storage-hub](https://github.com/FileUni/yh-filemanager-vfs-storage-hub) - VFS core
+- [homebrew-fileuni](https://github.com/FileUni/homebrew-fileuni) - Homebrew tap
+- [scoop-fileuni](https://github.com/FileUni/scoop-fileuni) - Scoop bucket
+- [nixpkgs-fileuni](https://github.com/FileUni/nixpkgs-fileuni) - Nix package
 
 ## Source Availability
 

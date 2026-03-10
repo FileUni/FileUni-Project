@@ -29,11 +29,12 @@ FileUni 的主要开发工作区位于私有 monorepo，本仓库会同步部分
 
 ## 相关仓库
 
-- [FileUni 官网](https://fileuni.com/)
-- [FileUni 全部仓库](https://github.com/FileUni?tab=repositories)
-- [OfficialSiteDocs](https://github.com/FileUni/OfficialSiteDocs)
-- [OfficialSitePrivate](https://github.com/FileUni/OfficialSitePrivate)
-- [yh-filemanager-vfs-storage-hub](https://github.com/FileUni/yh-filemanager-vfs-storage-hub)
+- [OfficialSiteDocs](https://github.com/FileUni/OfficialSiteDocs) - 文档站
+- [frontends](https://github.com/FileUni/frontends) - 前端组件
+- [yh-filemanager-vfs-storage-hub](https://github.com/FileUni/yh-filemanager-vfs-storage-hub) - VFS 核心
+- [homebrew-fileuni](https://github.com/FileUni/homebrew-fileuni) - Homebrew tap
+- [scoop-fileuni](https://github.com/FileUni/scoop-fileuni) - Scoop bucket
+- [nixpkgs-fileuni](https://github.com/FileUni/nixpkgs-fileuni) - Nix package
 
 ## 源码开放情况
 

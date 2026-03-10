@@ -29,11 +29,12 @@ Workspace pengembangan utama berada di monorepo privat, dan beberapa komponen di
 
 ## Repositori terkait
 
-- [FileUni Website](https://fileuni.com/)
-- [FileUni Repositories](https://github.com/FileUni?tab=repositories)
-- [OfficialSiteDocs](https://github.com/FileUni/OfficialSiteDocs)
-- [OfficialSitePrivate](https://github.com/FileUni/OfficialSitePrivate)
-- [yh-filemanager-vfs-storage-hub](https://github.com/FileUni/yh-filemanager-vfs-storage-hub)
+- [OfficialSiteDocs](https://github.com/FileUni/OfficialSiteDocs) - Dokumentasi
+- [frontends](https://github.com/FileUni/frontends) - Komponen frontend
+- [yh-filemanager-vfs-storage-hub](https://github.com/FileUni/yh-filemanager-vfs-storage-hub) - Inti VFS
+- [homebrew-fileuni](https://github.com/FileUni/homebrew-fileuni) - Homebrew tap
+- [scoop-fileuni](https://github.com/FileUni/scoop-fileuni) - Scoop bucket
+- [nixpkgs-fileuni](https://github.com/FileUni/nixpkgs-fileuni) - Paket Nix
 
 ## Ketersediaan source code
 
