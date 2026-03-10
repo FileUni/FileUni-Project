@@ -36,4 +36,7 @@ FILEUNI_NPM_BASE_URL=https://github.com/FileUni/FileUni-Project npm install file
 
 ## License
 
-MIT
+This project is licensed under the FileUni Community Source License v1.0.
+
+For the full license text, please see:
+https://github.com/FileUni/FileUni-Project/blob/main/LICENSE

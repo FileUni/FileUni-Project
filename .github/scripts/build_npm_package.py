@@ -110,7 +110,7 @@ def build_package(args: argparse.Namespace) -> int:
         "name": package_meta["name"],
         "version": args.version,
         "description": package_meta["description"],
-        "license": "MIT",
+        "license": "UNLICENSED",
         "repository": {
             "type": "git",
             "url": "https://github.com/fileuni/FileUni-Project.git",
