@@ -95,7 +95,10 @@ def release_url(release_tag: str, asset_name: str) -> str:
 
 
 def render_formula(version: str, release_tag: str, checksums: dict[str, str]) -> str:
-    urls = {target: release_url(release_tag, asset_name_for_target(target)) for target in checksums}
+    urls = {
+        target: release_url(release_tag, asset_name_for_target(target))
+        for target in checksums
+    }
     return f'''class Fileuni < Formula
   desc "FileUni CLI"
   homepage "https://fileuni.com"
@@ -104,21 +107,21 @@ def render_formula(version: str, release_tag: str, checksums: dict[str, str]) ->
 
   on_macos do
     if Hardware::CPU.arm?
-      url "{urls['aarch64-apple-darwin']}"
-      sha256 "{checksums['aarch64-apple-darwin']}"
+      url "{urls["aarch64-apple-darwin"]}"
+      sha256 "{checksums["aarch64-apple-darwin"]}"
     else
-      url "{urls['x86_64-apple-darwin']}"
-      sha256 "{checksums['x86_64-apple-darwin']}"
+      url "{urls["x86_64-apple-darwin"]}"
+      sha256 "{checksums["x86_64-apple-darwin"]}"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "{urls['aarch64-unknown-linux-gnu']}"
-      sha256 "{checksums['aarch64-unknown-linux-gnu']}"
+      url "{urls["aarch64-unknown-linux-gnu"]}"
+      sha256 "{checksums["aarch64-unknown-linux-gnu"]}"
     else
-      url "{urls['x86_64-unknown-linux-gnu']}"
-      sha256 "{checksums['x86_64-unknown-linux-gnu']}"
+      url "{urls["x86_64-unknown-linux-gnu"]}"
+      sha256 "{checksums["x86_64-unknown-linux-gnu"]}"
     end
   end
 
@@ -133,7 +136,9 @@ end
 '''
 
 
-def render_scoop_manifest(version: str, release_tag: str, checksums: dict[str, str]) -> str:
+def render_scoop_manifest(
+    version: str, release_tag: str, checksums: dict[str, str]
+) -> str:
     manifest = {
         "version": version,
         "description": "FileUni CLI",
@@ -144,11 +149,15 @@ def render_scoop_manifest(version: str, release_tag: str, checksums: dict[str, s
         },
         "architecture": {
             "64bit": {
-                "url": release_url(release_tag, asset_name_for_target("x86_64-pc-windows-msvc")),
+                "url": release_url(
+                    release_tag, asset_name_for_target("x86_64-pc-windows-msvc")
+                ),
                 "hash": checksums["x86_64-pc-windows-msvc"],
             },
             "32bit": {
-                "url": release_url(release_tag, asset_name_for_target("i686-pc-windows-msvc")),
+                "url": release_url(
+                    release_tag, asset_name_for_target("i686-pc-windows-msvc")
+                ),
                 "hash": checksums["i686-pc-windows-msvc"],
             },
         },
@@ -167,22 +176,32 @@ def hex_to_sri_sha256(hex_digest: str) -> str:
     return "sha256-" + base64.b64encode(bytes.fromhex(hex_digest)).decode("ascii")
 
 
-def render_nix_package(version: str, release_tag: str, checksums: dict[str, str]) -> str:
+def render_nix_package(
+    version: str, release_tag: str, checksums: dict[str, str]
+) -> str:
     systems = {
         "x86_64-linux": {
-            "url": release_url(release_tag, asset_name_for_target("x86_64-unknown-linux-gnu")),
+            "url": release_url(
+                release_tag, asset_name_for_target("x86_64-unknown-linux-gnu")
+            ),
             "hash": hex_to_sri_sha256(checksums["x86_64-unknown-linux-gnu"]),
         },
         "aarch64-linux": {
-            "url": release_url(release_tag, asset_name_for_target("aarch64-unknown-linux-gnu")),
+            "url": release_url(
+                release_tag, asset_name_for_target("aarch64-unknown-linux-gnu")
+            ),
             "hash": hex_to_sri_sha256(checksums["aarch64-unknown-linux-gnu"]),
         },
         "x86_64-darwin": {
-            "url": release_url(release_tag, asset_name_for_target("x86_64-apple-darwin")),
+            "url": release_url(
+                release_tag, asset_name_for_target("x86_64-apple-darwin")
+            ),
             "hash": hex_to_sri_sha256(checksums["x86_64-apple-darwin"]),
         },
         "aarch64-darwin": {
-            "url": release_url(release_tag, asset_name_for_target("aarch64-apple-darwin")),
+            "url": release_url(
+                release_tag, asset_name_for_target("aarch64-apple-darwin")
+            ),
             "hash": hex_to_sri_sha256(checksums["aarch64-apple-darwin"]),
         },
     }
@@ -194,7 +213,7 @@ def render_nix_package(version: str, release_tag: str, checksums: dict[str, str]
         )
     sources_block = "\n".join(entries)
 
-    return f'''{{ lib, stdenvNoCC, fetchzip }}:
+    return f'''{{ lib, stdenvNoCC, fetchurl, unzip }}:
 
 let
   pname = "fileuni";
@@ -208,18 +227,28 @@ in
 stdenvNoCC.mkDerivation {{
   inherit pname version;
 
-  src = fetchzip {{
+  src = fetchurl {{
     url = source.url;
     hash = source.hash;
-    stripRoot = false;
   }};
+
+  nativeBuildInputs = [ unzip ];
 
   dontConfigure = true;
   dontBuild = true;
 
+  unpackPhase = ''
+    runHook preUnpack
+    mkdir -p source
+    unzip -q "$src" -d source
+    runHook postUnpack
+  '';
+
+  sourceRoot = "source";
+
   installPhase = ''
     runHook preInstall
-    install -Dm755 "$src/fileuni" "$out/bin/fileuni"
+    install -Dm755 "$sourceRoot/fileuni" "$out/bin/fileuni"
     runHook postInstall
   '';
 
@@ -256,28 +285,52 @@ def copy_tree_contents(source_dir: Path, target_dir: Path) -> None:
         shutil.copy2(path, destination)
 
 
-def generate_homebrew_repo(output_dir: Path, template_root: Path, version: str, release_tag: str, checksums: dict[str, str]) -> None:
+def generate_homebrew_repo(
+    output_dir: Path,
+    template_root: Path,
+    version: str,
+    release_tag: str,
+    checksums: dict[str, str],
+) -> None:
     reset_directory(output_dir)
     copy_tree_contents(template_root / "homebrew", output_dir)
     formula_path = output_dir / "Formula" / "fileuni.rb"
     formula_path.parent.mkdir(parents=True, exist_ok=True)
-    formula_path.write_text(render_formula(version, release_tag, checksums), encoding="utf-8")
+    formula_path.write_text(
+        render_formula(version, release_tag, checksums), encoding="utf-8"
+    )
 
 
-def generate_scoop_repo(output_dir: Path, template_root: Path, version: str, release_tag: str, checksums: dict[str, str]) -> None:
+def generate_scoop_repo(
+    output_dir: Path,
+    template_root: Path,
+    version: str,
+    release_tag: str,
+    checksums: dict[str, str],
+) -> None:
     reset_directory(output_dir)
     copy_tree_contents(template_root / "scoop", output_dir)
     manifest_path = output_dir / "bucket" / "fileuni.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(render_scoop_manifest(version, release_tag, checksums), encoding="utf-8")
+    manifest_path.write_text(
+        render_scoop_manifest(version, release_tag, checksums), encoding="utf-8"
+    )
 
 
-def generate_nix_repo(output_dir: Path, template_root: Path, version: str, release_tag: str, checksums: dict[str, str]) -> None:
+def generate_nix_repo(
+    output_dir: Path,
+    template_root: Path,
+    version: str,
+    release_tag: str,
+    checksums: dict[str, str],
+) -> None:
     reset_directory(output_dir)
     copy_tree_contents(template_root / "nix", output_dir)
     nix_path = output_dir / "pkgs" / "fileuni-bin.nix"
     nix_path.parent.mkdir(parents=True, exist_ok=True)
-    nix_path.write_text(render_nix_package(version, release_tag, checksums), encoding="utf-8")
+    nix_path.write_text(
+        render_nix_package(version, release_tag, checksums), encoding="utf-8"
+    )
 
 
 def generate_package_repos(args: argparse.Namespace) -> int:
@@ -292,16 +345,39 @@ def generate_package_repos(args: argparse.Namespace) -> int:
         "x86_64-pc-windows-msvc",
         "i686-pc-windows-msvc",
     ]
-    checksums = {target: sha256_file(find_asset(artifact_root, target)) for target in checksum_targets}
+    checksums = {
+        target: sha256_file(find_asset(artifact_root, target))
+        for target in checksum_targets
+    }
 
-    generate_homebrew_repo(Path(args.homebrew_out).resolve(), template_root, args.version, args.release_tag, checksums)
-    generate_scoop_repo(Path(args.scoop_out).resolve(), template_root, args.version, args.release_tag, checksums)
-    generate_nix_repo(Path(args.nix_out).resolve(), template_root, args.version, args.release_tag, checksums)
+    generate_homebrew_repo(
+        Path(args.homebrew_out).resolve(),
+        template_root,
+        args.version,
+        args.release_tag,
+        checksums,
+    )
+    generate_scoop_repo(
+        Path(args.scoop_out).resolve(),
+        template_root,
+        args.version,
+        args.release_tag,
+        checksums,
+    )
+    generate_nix_repo(
+        Path(args.nix_out).resolve(),
+        template_root,
+        args.version,
+        args.release_tag,
+        checksums,
+    )
     return 0
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate Homebrew, Scoop, and Nix package repositories")
+    parser = argparse.ArgumentParser(
+        description="Generate Homebrew, Scoop, and Nix package repositories"
+    )
     parser.add_argument("--artifact-root", required=True)
     parser.add_argument("--template-root", required=True)
     parser.add_argument("--homebrew-out", required=True)
