@@ -1055,6 +1055,14 @@ jobs:
       - name: Setup Android SDK/NDK
         uses: android-actions/setup-android@v3
 
+      - name: Install Android build-tools (zipalign/apksigner)
+        shell: bash
+        run: |
+          sdkmanager "build-tools;34.0.0"
+          set +o pipefail
+          yes | sdkmanager --licenses > /dev/null
+          set -o pipefail
+
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
         with:
@@ -1093,24 +1101,26 @@ jobs:
       - name: Zipalign + apksigner (debug/release)
         shell: bash
         env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-          ANDROID_KEY_BASE64: ${{ secrets.ANDROID_KEY_BASE64 }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_SIGNING_KEYSTORE_BASE64: ${{ secrets.ANDROID_SIGNING_KEYSTORE_BASE64 }}
+          ANDROID_SIGNING_PASSWORD: ${{ secrets.ANDROID_SIGNING_PASSWORD }}
         run: |
           set -euo pipefail
+          if [ -z "${ANDROID_SIGNING_KEYSTORE_BASE64:-}" ]; then
+            echo "::error::Missing secret ANDROID_SIGNING_KEYSTORE_BASE64 (Base64-encoded JKS/PKCS12 keystore)"
+            exit 1
+          fi
+          if [ -z "${ANDROID_SIGNING_PASSWORD:-}" ]; then
+            echo "::error::Missing secret ANDROID_SIGNING_PASSWORD (used for both keystore and key password)"
+            exit 1
+          fi
+
           sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
           if [ -z "${sdk_root}" ]; then
             echo "::error::ANDROID_SDK_ROOT/ANDROID_HOME not set"
             exit 1
           fi
 
-          build_tools="$(ls -d "${sdk_root}/build-tools/"* 2>/dev/null | sort -V | tail -1 || true)"
-          if [ -z "${build_tools}" ]; then
-            echo "::error::Android build-tools not found under ${sdk_root}"
-            exit 1
-          fi
+          build_tools="${sdk_root}/build-tools/34.0.0"
           zipalign="${build_tools}/zipalign"
           apksigner="${build_tools}/apksigner"
           if [ ! -x "${zipalign}" ] || [ ! -x "${apksigner}" ]; then
@@ -1127,33 +1137,10 @@ jobs:
             exit 1
           fi
 
-          key_b64="${ANDROID_KEYSTORE_BASE64:-${ANDROID_KEY_BASE64:-}}"
-          if [ -n "${key_b64}" ]; then
-            keystore="${RUNNER_TEMP}/android-release.keystore"
-            printf '%s' "${key_b64}" | base64 -d > "${keystore}"
-            key_alias="${ANDROID_KEY_ALIAS}"
-            store_pass="${ANDROID_STORE_PASSWORD:-${ANDROID_KEY_PASSWORD}}"
-            key_pass="${ANDROID_KEY_PASSWORD:-${ANDROID_STORE_PASSWORD}}"
-          else
-            keystore="${RUNNER_TEMP}/android-debug.keystore"
-            key_alias="androiddebugkey"
-            store_pass="android"
-            key_pass="android"
-            keytool -genkeypair -v \
-              -keystore "${keystore}" \
-              -storepass "${store_pass}" \
-              -keypass "${key_pass}" \
-              -alias "${key_alias}" \
-              -keyalg RSA \
-              -keysize 2048 \
-              -validity 10000 \
-              -dname "CN=Android Debug,O=Android,C=US"
-          fi
-
-          if [ -z "${key_alias}" ] || [ -z "${store_pass}" ] || [ -z "${key_pass}" ]; then
-            echo "::error::Signing credentials missing"
-            exit 1
-          fi
+          keystore="${RUNNER_TEMP}/android-release.keystore"
+          printf '%s' "${ANDROID_SIGNING_KEYSTORE_BASE64}" | base64 -d > "${keystore}"
+          chmod 600 "${keystore}" 2>/dev/null || true
+          key_alias="fileuni"
 
           aligned="${RUNNER_TEMP}/fileuni-aligned.apk"
           signed="${RUNNER_TEMP}/fileuni-signed.apk"
@@ -1161,8 +1148,8 @@ jobs:
           "${apksigner}" sign \
             --ks "${keystore}" \
             --ks-key-alias "${key_alias}" \
-            --ks-pass "pass:${store_pass}" \
-            --key-pass "pass:${key_pass}" \
+            --ks-pass "env:ANDROID_SIGNING_PASSWORD" \
+            --key-pass "env:ANDROID_SIGNING_PASSWORD" \
             --out "${signed}" \
             "${aligned}"
           "${apksigner}" verify --verbose "${signed}"
