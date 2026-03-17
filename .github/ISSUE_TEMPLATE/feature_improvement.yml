@@ -5,9 +5,10 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for your suggestion! This form is for **improvements to existing features only**. For new feature ideas, please use [Discussions](https://github.com/FileUni/FileUni-Project/discussions).
-        
-        Please describe in English (imperfect grammar or machine translation is fine). See our [Language Policy](https://github.com/FileUni/FileUni-Project/blob/main/CONTRIBUTING.md#language-policy) and [Why English](https://github.com/FileUni/FileUni-Project/blob/main/CONTRIBUTING.md#why-english).
+        Thank you for your suggestion!
+        This form is for **improvements to existing features**.
+        For brand new feature ideas, please use [Discussions](https://github.com/FileUni/FileUni-Project/discussions).
+        Please describe in English (machine translation is OK).
 
   - type: checkboxes
     id: pre-check
@@ -19,35 +20,29 @@ body:
         - label: I have searched existing issues and discussions
           required: true
 
-  - type: dropdown
-    id: area
-    attributes:
-      label: Feature Area
-      options:
-        - File Management
-        - User Interface
-        - Authentication & Users
-        - Performance
-        - API
-        - Other
-    validations:
-      required: true
-
   - type: textarea
     id: current
     attributes:
-      label: Current Behavior
+      label: Current behavior / pain point
+      description: What is frustrating or inefficient today?
     validations:
       required: true
 
   - type: textarea
     id: improvement
     attributes:
-      label: Proposed Improvement
+      label: Proposed improvement
+      description: What should change? Include UI/UX details if relevant.
     validations:
       required: true
 
   - type: textarea
     id: benefit
     attributes:
-      label: Benefits (optional)
+      label: Why is it better? (optional)
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Extra context (optional)
+      description: Screenshots, examples, links, or alternative approaches.
