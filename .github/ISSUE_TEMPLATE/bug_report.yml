@@ -15,3 +15,28 @@ body:
       options:
         - label: I have searched existing issues to avoid duplicates
           required: true
+
+  - type: textarea
+    id: describe
+    attributes:
+      label: Describe the bug
+      description: What happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context / detailed description
+      description: Logs, screenshots, version/OS, configuration, or anything else that helps.

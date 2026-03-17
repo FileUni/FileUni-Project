@@ -15,3 +15,11 @@ body:
       options:
         - label: I have searched existing issues to avoid duplicates
           required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Detailed description
+      description: What should be improved? Include examples, screenshots, or current behavior if helpful.
+    validations:
+      required: true
