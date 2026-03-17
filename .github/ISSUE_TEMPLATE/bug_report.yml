@@ -5,7 +5,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for reporting a bug! Please describe the issue in English (machine translation is OK).
+        Thank you for reporting a bug!
+        Please write the issue in English (machine translation is OK).
 
   - type: checkboxes
     id: pre-check
@@ -14,35 +15,3 @@ body:
       options:
         - label: I have searched existing issues to avoid duplicates
           required: true
-
-  - type: textarea
-    id: description
-    attributes:
-      label: What happened?
-      description: A clear and concise description of the bug.
-    validations:
-      required: true
-
-  - type: textarea
-    id: steps
-    attributes:
-      label: Steps to reproduce (optional)
-      placeholder: |
-        1. 
-        2. 
-        3. 
-
-  - type: textarea
-    id: environment
-    attributes:
-      label: Environment (optional)
-      placeholder: |
-        - FileUni Version:
-        - OS:
-        - Browser/Deployment:
-
-  - type: textarea
-    id: logs
-    attributes:
-      label: Relevant Logs (optional)
-      render: shell
