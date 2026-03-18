@@ -5,8 +5,8 @@
 - Windows
 - Scoop installed
 - Supported architecture:
-  - x64
-  - x86
+ - x64
+ - x86
 
 ## Add Bucket
 

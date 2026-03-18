@@ -4,16 +4,10 @@
 
 # FileUni Project
 
-<p align="center">
-  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/Website-fileuni.com-blue?style=for-the-badge" alt="Website"></a>
-  <a href="https://docs.fileuni.com"><img src="https://img.shields.io/badge/Tài_liệu-docs.fileuni.com-green?style=for-the-badge" alt="Tài liệu"></a>
-  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>
-  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a>
-</p>
+<p align="center">  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/Website-fileuni.com-blue?style=for-the-badge" alt="Website"></a>  <a href="https://docs.fileuni.com"><img src="https://img.shields.io/badge/Tài_liệu-docs.fileuni.com-green?style=for-the-badge" alt="Tài liệu"></a>  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a> </p> 
+> Lưu ý: Dự án này vẫn đang ở giai đoạn đầu. Nó có thể chưa ổn định và hiện chỉ dành cho mục đích thử nghiệm và giáo dục.
 
-> ⚠️ Lưu ý: Dự án này vẫn đang ở giai đoạn đầu. Nó có thể chưa ổn định và hiện chỉ dành cho mục đích thử nghiệm và giáo dục.
-
-**FileUni** là nền tảng lưu trữ và quản lý tệp thế hệ mới được xây dựng bằng Rust, tập trung vào hiệu năng, bảo mật và triển khai theo mô-đun.
+FileUni là nền tảng lưu trữ và quản lý tệp thế hệ mới được xây dựng bằng Rust, tập trung vào hiệu năng, bảo mật và triển khai theo mô-đun.
 
 Từ thiết bị siêu nhẹ đến máy chủ đầy đủ, FileUni cung cấp khả năng kiểu NAS mà không cần phần cứng chuyên dụng, đồng thời duy trì một codebase thống nhất có thể mở rộng cho CLI, GUI và các thành phần web.
 

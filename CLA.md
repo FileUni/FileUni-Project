@@ -6,9 +6,9 @@ This Contributor License Agreement ("Agreement") governs your contributions to t
 
 ## 1. Definitions
 
-- **"Contribution"** means any work of authorship, including any modifications or additions to an existing work, that is submitted by You to Us for inclusion in, or documentation of, the FileUni project.
-- **"Submit"** means any form of electronic, verbal, or written communication sent to Us or Our representatives, including but not limited to communication on electronic mailing lists, source code control systems, and issue tracking systems.
-- **"You"** (or "Your") means the individual or legal entity exercising permissions granted by this Agreement.
+- "Contribution" means any work of authorship, including any modifications or additions to an existing work, that is submitted by You to Us for inclusion in, or documentation of, the FileUni project.
+- "Submit" means any form of electronic, verbal, or written communication sent to Us or Our representatives, including but not limited to communication on electronic mailing lists, source code control systems, and issue tracking systems.
+- "You" (or "Your") means the individual or legal entity exercising permissions granted by this Agreement.
 
 ## 2. Grant of License
 
@@ -60,6 +60,6 @@ By submitting a Contribution to the FileUni project, You acknowledge that You ha
 
 ---
 
-**Questions?**
+Questions?
 
 If you have any questions about this Agreement, please open an issue at [FileUni/FileUni-Project](https://github.com/FileUni/FileUni-Project/issues).
