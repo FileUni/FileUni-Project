@@ -4,10 +4,10 @@
 
 - Homebrew installed
 - Supported platform:
-  - macOS Apple Silicon
-  - macOS Intel
-  - Linux x86_64 with GNU libc
-  - Linux arm64 with GNU libc
+ - macOS Apple Silicon
+ - macOS Intel
+ - Linux x86_64 with GNU libc
+ - Linux arm64 with GNU libc
 
 ## Add Tap
 

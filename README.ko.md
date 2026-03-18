@@ -4,16 +4,10 @@
 
 # FileUni Project
 
-<p align="center">
-  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/웹사이트-fileuni.com-blue?style=for-the-badge" alt="웹사이트"></a>
-  <a href="https://docs.fileuni.com"><img src="https://img.shields.io/badge/문서-docs.fileuni.com-green?style=for-the-badge" alt="문서"></a>
-  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>
-  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a>
-</p>
+<p align="center">  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/웹사이트-fileuni.com-blue?style=for-the-badge" alt="웹사이트"></a>  <a href="https://docs.fileuni.com"><img src="https://img.shields.io/badge/문서-docs.fileuni.com-green?style=for-the-badge" alt="문서"></a>  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a> </p> 
+> 안내: 이 프로젝트는 아직 초기 단계에 있습니다. 불안정할 수 있으며 현재는 테스트 및 교육용으로만 사용하도록 의도되었습니다.
 
-> ⚠️ 안내: 이 프로젝트는 아직 초기 단계에 있습니다. 불안정할 수 있으며 현재는 테스트 및 교육용으로만 사용하도록 의도되었습니다.
-
-**FileUni**는 성능, 보안, 모듈형 배포를 위해 Rust로 구축된 차세대 스토리지 및 파일 관리 플랫폼입니다.
+FileUni는 성능, 보안, 모듈형 배포를 위해 Rust로 구축된 차세대 스토리지 및 파일 관리 플랫폼입니다.
 
 초경량 장치부터 완전한 서버까지, FileUni는 전용 하드웨어 없이 NAS급 기능을 제공하며 CLI, GUI, 웹 구성 요소 전반에 걸쳐 하나의 확장 가능한 코드베이스를 유지합니다.
 

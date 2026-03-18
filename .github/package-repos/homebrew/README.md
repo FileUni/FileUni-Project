@@ -9,10 +9,10 @@ Do not edit generated formula files manually.
 
 - Formula: `fileuni`
 - Supported platforms:
-  - macOS Apple Silicon
-  - macOS Intel
-  - Linux x86_64 (GNU libc)
-  - Linux arm64 (GNU libc)
+ - macOS Apple Silicon
+ - macOS Intel
+ - Linux x86_64 (GNU libc)
+ - Linux arm64 (GNU libc)
 
 ## Install
 

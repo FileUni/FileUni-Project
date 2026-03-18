@@ -20,9 +20,9 @@ All communications in this repository must be in English, including code, commen
 
 ### Why English?
 
-- **Global Accessibility**: Contributors from all regions can collaborate effectively
-- **Consistency**: A single language keeps discussions organized and searchable
-- **Open Source Best Practice**: Most successful open-source projects use English as the lingua franca
+- Global Accessibility: Contributors from all regions can collaborate effectively
+- Consistency: A single language keeps discussions organized and searchable
+- Open Source Best Practice: Most successful open-source projects use English as the lingua franca
 
 ### Need Help with English?
 
@@ -47,15 +47,15 @@ If English isn't your first language, don't worry! We value your contributions r
 
 ### Rust Standards
 
-- [ ] **Zero `.unwrap()` / `.expect()`** - Use `?` operator or `match` for error propagation
-- [ ] **Clippy compliance** - `cargo clippy -- -D warnings` must pass with zero warnings
-- [ ] **Code formatting** - `cargo fmt` must pass
-- [ ] **Single file < 500 lines** - Files > 800 lines need splitting; > 1000 lines mandatory split
-- [ ] **No `mut` without justification** - Prefer immutable by default
-- [ ] **Minimize `.clone()`** - Consider references, `Cow`, `Arc` before cloning
-- [ ] **Use iterator chains** - Prefer `map`, `filter`, `collect` over manual loops
-- [ ] **No blocking in async** - Use `spawn_blocking` for CPU-intensive operations
-- [ ] **Timeout for spawn** - All `tokio::spawn` tasks must include timeout (default 24h), except permanent background services
+- [ ] Zero `.unwrap()` / `.expect()` - Use `?` operator or `match` for error propagation
+- [ ] Clippy compliance - `cargo clippy -- -D warnings` must pass with zero warnings
+- [ ] Code formatting - `cargo fmt` must pass
+- [ ] Single file < 500 lines - Files > 800 lines need splitting; > 1000 lines mandatory split
+- [ ] No `mut` without justification - Prefer immutable by default
+- [ ] Minimize `.clone()` - Consider references, `Cow`, `Arc` before cloning
+- [ ] Use iterator chains - Prefer `map`, `filter`, `collect` over manual loops
+- [ ] No blocking in async - Use `spawn_blocking` for CPU-intensive operations
+- [ ] Timeout for spawn - All `tokio::spawn` tasks must include timeout (default 24h), except permanent background services
 
 ### Async & Concurrency
 
@@ -85,9 +85,9 @@ If English isn't your first language, don't worry! We value your contributions r
 
 ### Frontend (TypeScript/React/Astro)
 
-- [ ] **Zero `any` types** - Use `bun run gen-api` for auto-generated types
-- [ ] **Type check** - `bun run check` must pass with zero errors and warnings
-- [ ] **Format** - `bun run format` must pass
+- [ ] Zero `any` types - Use `bun run gen-api` for auto-generated types
+- [ ] Type check - `bun run check` must pass with zero errors and warnings
+- [ ] Format - `bun run format` must pass
 - [ ] Use `openapi-fetch` from `src/lib/api.ts`
 - [ ] All `t('key')` must exist in all language files
 - [ ] Modals close on `Esc` key
@@ -95,7 +95,7 @@ If English isn't your first language, don't worry! We value your contributions r
 
 ### Configuration
 
-- [ ] **No environment variables** - All config from config files only
+- [ ] No environment variables - All config from config files only
 - [ ] Config struct 100% matches `{config-date}/config.toml`
 - [ ] No hardcoded paths - use `{APPDATADIR}` placeholder
 - [ ] Module business params in module's `config.rs`
@@ -130,13 +130,13 @@ How does it follow project conventions?
 
 ### Mandatory Checks
 
-**Rust:**
+Rust:
 ```bash
 cargo clippy -- -D warnings
 cargo fmt --check
 ```
 
-**Frontend:**
+Frontend:
 ```bash
 cd frontends/cli && bun run check
 cd frontends/gui && bun run check

@@ -9,8 +9,8 @@ Do not edit generated manifest files manually.
 
 - Manifest: `fileuni`
 - Supported platforms:
-  - Windows x64
-  - Windows x86
+ - Windows x64
+ - Windows x86
 
 ## Install
 

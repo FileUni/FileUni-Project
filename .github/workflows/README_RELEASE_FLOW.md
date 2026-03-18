@@ -44,13 +44,13 @@ Important `workflow_dispatch` inputs:
 
 ## Stages
 
-1. **resolve-matrix** — Resolve source ref, release metadata, and build matrix
-2. **build-frontends** — Build CLI and GUI frontend assets from WorkSpace
-3. **build-cli** — Build CLI artifacts across cargo-dist, cross, Android, BSD, and package formats
-4. **build-gui** — Build GUI artifacts across desktop Tauri, Android, and iOS paths
-5. **publish** — Collect standardized `FileUni-*` artifacts, generate release notes, and publish the GitHub Release
-6. **update-package-indexes** — Update Homebrew tap, Scoop bucket, and Nix package sources in WorkSpace after a tag release
-7. **publish-npm** — Build and publish the single `fileuni` npm package after the GitHub Release is available
+1. resolve-matrix — Resolve source ref, release metadata, and build matrix
+2. build-frontends — Build CLI and GUI frontend assets from WorkSpace
+3. build-cli — Build CLI artifacts across cargo-dist, cross, Android, BSD, and package formats
+4. build-gui — Build GUI artifacts across desktop Tauri, Android, and iOS paths
+5. publish — Collect standardized `FileUni-*` artifacts, generate release notes, and publish the GitHub Release
+6. update-package-indexes — Update Homebrew tap, Scoop bucket, and Nix package sources in WorkSpace after a tag release
+7. publish-npm — Build and publish the single `fileuni` npm package after the GitHub Release is available
 
 ## Artifact Naming
 

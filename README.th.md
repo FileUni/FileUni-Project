@@ -4,16 +4,10 @@
 
 # FileUni Project
 
-<p align="center">
-  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/เว็บไซต์-fileuni.com-blue?style=for-the-badge" alt="เว็บไซต์"></a>
-  <a href="https://docs.fileuni.com"><img src="https://img.shields.io/badge/เอกสาร-docs.fileuni.com-green?style=for-the-badge" alt="เอกสาร"></a>
-  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>
-  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a>
-</p>
+<p align="center">  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/เว็บไซต์-fileuni.com-blue?style=for-the-badge" alt="เว็บไซต์"></a>  <a href="https://docs.fileuni.com"><img src="https://img.shields.io/badge/เอกสาร-docs.fileuni.com-green?style=for-the-badge" alt="เอกสาร"></a>  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a> </p> 
+> หมายเหตุ: โปรเจกต์นี้ยังอยู่ในระยะเริ่มต้น อาจยังไม่เสถียร และขณะนี้มีไว้สำหรับการทดสอบและการใช้งานเพื่อการศึกษาเท่านั้น
 
-> ⚠️ หมายเหตุ: โปรเจกต์นี้ยังอยู่ในระยะเริ่มต้น อาจยังไม่เสถียร และขณะนี้มีไว้สำหรับการทดสอบและการใช้งานเพื่อการศึกษาเท่านั้น
-
-**FileUni** คือแพลตฟอร์มจัดการไฟล์และระบบจัดเก็บข้อมูลยุคใหม่ที่พัฒนาด้วย Rust โดยเน้นประสิทธิภาพ ความปลอดภัย และการปรับใช้แบบแยกส่วน
+FileUni คือแพลตฟอร์มจัดการไฟล์และระบบจัดเก็บข้อมูลยุคใหม่ที่พัฒนาด้วย Rust โดยเน้นประสิทธิภาพ ความปลอดภัย และการปรับใช้แบบแยกส่วน
 
 ตั้งแต่อุปกรณ์ขนาดเล็กมากไปจนถึงเซิร์ฟเวอร์เต็มรูปแบบ FileUni ออกแบบมาเพื่อมอบความสามารถแบบ NAS โดยไม่ต้องใช้ฮาร์ดแวร์เฉพาะทาง พร้อมคงไว้ซึ่ง codebase เดียวที่ขยายต่อได้สำหรับ CLI, GUI และส่วนประกอบเว็บ
 
