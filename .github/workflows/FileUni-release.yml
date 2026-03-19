@@ -247,7 +247,7 @@ jobs:
 
           echo "::notice::mode=${mode} target=${target_set} cli_cargo_dist=$(echo "$cli_cargo_dist" | jq 'length') cli_cross=$(echo "$cli_cross" | jq 'length') cli_android=$(echo "$cli_android" | jq 'length') cli_vmactions=$(echo "$cli_vmactions" | jq 'length') cli_nfpm=$(echo "$cli_nfpm" | jq 'length') gui_tauri=$(echo "$gui_tauri" | jq 'length') gui_android=$(echo "$gui_android" | jq 'length') gui_ios=$(echo "$gui_ios" | jq 'length')"
 
-  build-frontend-cli:
+  build-frontend-ui:
     needs: resolve-matrix
     if: needs.resolve-matrix.outputs.has_cli == 'true' || needs.resolve-matrix.outputs.has_gui == 'true'
     runs-on: ubuntu-latest
@@ -273,73 +273,29 @@ jobs:
           path: |
             ~/.bun/install/cache
             workspace/frontends/node_modules
-            workspace/frontends/cli/node_modules
+            workspace/frontends/ui/node_modules
             workspace/frontends/shared/node_modules
           key: bun-${{ hashFiles('workspace/frontends/bun.lock') }}
           restore-keys: bun-
 
-      - name: Build CLI frontend
+      - name: Build UI frontend
         working-directory: workspace/frontends
         run: |
           bun install
-          bun run --cwd cli build
-          test -f cli/dist/index.html
+          bun run --cwd ui build
+          test -f ui/dist/index.html
 
-      - name: Upload CLI frontend dist
+      - name: Upload UI frontend dist
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-cli-dist
-          path: workspace/frontends/cli/dist
-
-  build-frontend-gui:
-    needs: resolve-matrix
-    if: needs.resolve-matrix.outputs.has_gui == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout workspace
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ env.WORKSPACE_REPO }}
-          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
-          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
-          path: workspace
-          submodules: true
-
-      - name: Sync favicon
-        run: bash workspace/script/fileSync.sh
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
-
-      - name: Cache Bun
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.bun/install/cache
-            workspace/frontends/node_modules
-            workspace/frontends/gui/node_modules
-            workspace/frontends/shared/node_modules
-          key: bun-${{ hashFiles('workspace/frontends/bun.lock') }}
-          restore-keys: bun-
-
-      - name: Build GUI frontend
-        working-directory: workspace/frontends
-        run: |
-          bun install
-          bun run --cwd gui build
-          test -f gui/dist/index.html
-
-      - name: Upload GUI frontend dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-gui-dist
-          path: workspace/frontends/gui/dist
+          name: frontend-ui-dist
+          path: workspace/frontends/ui/dist
 
   # ============================================================
   # Tier 1/2: cargo-dist native builds
   # ============================================================
   build-cli:
-    needs: [resolve-matrix, build-frontend-cli]
+    needs: [resolve-matrix, build-frontend-ui]
     if: needs.resolve-matrix.outputs.has_cargo_dist == 'true'
     strategy:
       fail-fast: false
@@ -364,8 +320,8 @@ jobs:
       - name: Download frontend dist
         uses: actions/download-artifact@v4
         with:
-          name: frontend-cli-dist
-          path: workspace/frontends/cli/dist
+          name: frontend-ui-dist
+          path: workspace/frontends/ui/dist
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -577,7 +533,7 @@ jobs:
   # Cross-compiled builds (Linux exotic)
   # ============================================================
   build-cli-cross:
-    needs: [resolve-matrix, build-frontend-cli]
+    needs: [resolve-matrix, build-frontend-ui]
     if: needs.resolve-matrix.outputs.has_cross == 'true'
     strategy:
       fail-fast: false
@@ -600,8 +556,8 @@ jobs:
       - name: Download frontend dist
         uses: actions/download-artifact@v4
         with:
-          name: frontend-cli-dist
-          path: workspace/frontends/cli/dist
+          name: frontend-ui-dist
+          path: workspace/frontends/ui/dist
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -680,7 +636,7 @@ jobs:
   # Android builds (cargo-ndk)
   # ============================================================
   build-cli-android:
-    needs: [resolve-matrix, build-frontend-cli]
+    needs: [resolve-matrix, build-frontend-ui]
     if: needs.resolve-matrix.outputs.has_android == 'true'
     strategy:
       fail-fast: false
@@ -703,8 +659,8 @@ jobs:
       - name: Download frontend dist
         uses: actions/download-artifact@v4
         with:
-          name: frontend-cli-dist
-          path: workspace/frontends/cli/dist
+          name: frontend-ui-dist
+          path: workspace/frontends/ui/dist
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -793,7 +749,7 @@ jobs:
   # GUI builds via Tauri (unsigned)
   # ============================================================
   build-gui:
-    needs: [resolve-matrix, build-frontend-cli, build-frontend-gui]
+    needs: [resolve-matrix, build-frontend-ui]
     if: needs.resolve-matrix.outputs.has_gui_tauri == 'true'
     strategy:
       fail-fast: false
@@ -813,17 +769,11 @@ jobs:
           path: workspace
           submodules: true
 
-      - name: Download GUI frontend dist
+      - name: Download UI frontend dist
         uses: actions/download-artifact@v4
         with:
-          name: frontend-gui-dist
-          path: workspace/frontends/gui/dist
-
-      - name: Download CLI frontend dist (required by embedded assets)
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-cli-dist
-          path: workspace/frontends/cli/dist
+          name: frontend-ui-dist
+          path: workspace/frontends/ui/dist
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -1012,7 +962,7 @@ jobs:
           path: dist/*
 
   build-gui-android:
-    needs: [resolve-matrix, build-frontend-cli, build-frontend-gui]
+    needs: [resolve-matrix, build-frontend-ui]
     if: needs.resolve-matrix.outputs.has_gui_android == 'true'
     strategy:
       fail-fast: false
@@ -1032,17 +982,11 @@ jobs:
           path: workspace
           submodules: true
 
-      - name: Download GUI frontend dist
+      - name: Download UI frontend dist
         uses: actions/download-artifact@v4
         with:
-          name: frontend-gui-dist
-          path: workspace/frontends/gui/dist
-
-      - name: Download CLI frontend dist (required by embedded assets)
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-cli-dist
-          path: workspace/frontends/cli/dist
+          name: frontend-ui-dist
+          path: workspace/frontends/ui/dist
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -1227,7 +1171,7 @@ jobs:
           path: dist/*
 
   build-gui-ios:
-    needs: [resolve-matrix, build-frontend-cli, build-frontend-gui]
+    needs: [resolve-matrix, build-frontend-ui]
     if: needs.resolve-matrix.outputs.has_gui_ios == 'true'
     strategy:
       fail-fast: false
@@ -1247,17 +1191,11 @@ jobs:
           path: workspace
           submodules: true
 
-      - name: Download GUI frontend dist
+      - name: Download UI frontend dist
         uses: actions/download-artifact@v4
         with:
-          name: frontend-gui-dist
-          path: workspace/frontends/gui/dist
-
-      - name: Download CLI frontend dist (required by embedded assets)
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-cli-dist
-          path: workspace/frontends/cli/dist
+          name: frontend-ui-dist
+          path: workspace/frontends/ui/dist
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -1441,7 +1379,7 @@ jobs:
   # BSD builds via vmactions (FreeBSD native VM)
   # ============================================================
   build-cli-bsd:
-    needs: [resolve-matrix, build-frontend-cli]
+    needs: [resolve-matrix, build-frontend-ui]
     if: needs.resolve-matrix.outputs.has_vmactions == 'true'
     strategy:
       fail-fast: false
@@ -1464,8 +1402,8 @@ jobs:
       - name: Download frontend dist
         uses: actions/download-artifact@v4
         with:
-          name: frontend-cli-dist
-          path: workspace/frontends/cli/dist
+          name: frontend-ui-dist
+          path: workspace/frontends/ui/dist
 
       - name: Build on FreeBSD
         if: matrix.os == 'freebsd'
