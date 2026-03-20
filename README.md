@@ -16,6 +16,7 @@ From ultra-light devices to full servers, FileUni is designed to provide NAS-sty
 This repository is the public project hub for FileUni. It is mainly used for:
 
 - Automated build and release workflows
+- Distribution publishing for CLI and GUI through GitHub Releases, Homebrew, Scoop, npm, and Nix
 - Public issue tracking and feedback
 - Community-facing project coordination
 - Subtree-based downstream sync targets
@@ -35,9 +36,9 @@ The main development workspace lives in the private monorepo and selected compon
 - [OfficialSiteDocs](https://github.com/FileUni/OfficialSiteDocs) - Documentation
 - [frontends](https://github.com/FileUni/frontends) - Frontend components
 - [yh-filemanager-vfs-storage-hub](https://github.com/FileUni/yh-filemanager-vfs-storage-hub) - VFS core
-- [homebrew-fileuni](https://github.com/FileUni/homebrew-fileuni) - Homebrew tap
-- [scoop-fileuni](https://github.com/FileUni/scoop-fileuni) - Scoop bucket
-- [nixpkgs-fileuni](https://github.com/FileUni/nixpkgs-fileuni) - Nix package
+- [homebrew-fileuni](https://github.com/FileUni/homebrew-fileuni) - Homebrew tap for the CLI formula and GUI cask
+- [scoop-fileuni](https://github.com/FileUni/scoop-fileuni) - Scoop bucket for the CLI and GUI manifests
+- [nixpkgs-fileuni](https://github.com/FileUni/nixpkgs-fileuni) - Nix package source for the CLI and Linux GUI packages
 
 ## Source Availability
 
