@@ -1,9 +1,10 @@
 {
-  description = "Standalone Nix package source for FileUni CLI";
+  description = "Standalone Nix package source for FileUni CLI and GUI";
 
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
-  outputs = { self, nixpkgs }:
+  outputs =
+    { self, nixpkgs }:
     let
       lib = nixpkgs.lib;
       systems = [
@@ -13,18 +14,30 @@
         "aarch64-darwin"
       ];
       forAllSystems = lib.genAttrs systems;
-    in {
-      packages = forAllSystems (system:
+    in
+    {
+      packages = forAllSystems (
+        system:
         let
           pkgs = import nixpkgs { inherit system; };
           fileuni = pkgs.callPackage ./pkgs/fileuni-bin.nix { };
-        in {
+        in
+        {
           inherit fileuni;
           default = fileuni;
-        });
+        }
+        // lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+          fileuni-gui = pkgs.callPackage ./pkgs/fileuni-gui-bin.nix { };
+        }
+      );
 
-      overlays.default = final: prev: {
-        fileuni = final.callPackage ./pkgs/fileuni-bin.nix { };
-      };
+      overlays.default =
+        final: prev:
+        {
+          fileuni = final.callPackage ./pkgs/fileuni-bin.nix { };
+        }
+        // lib.optionalAttrs final.stdenv.hostPlatform.isLinux {
+          fileuni-gui = final.callPackage ./pkgs/fileuni-gui-bin.nix { };
+        };
     };
 }

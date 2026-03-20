@@ -2,13 +2,33 @@ const fs = require('node:fs');
 const fsp = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
+const { spawn } = require('node:child_process');
 const AdmZip = require('adm-zip');
 
 const manifest = require('./fileuni-manifest.json');
 const packageRoot = path.resolve(__dirname, '..');
 const binDir = path.join(packageRoot, 'bin');
-const binaryBasePath = path.join(binDir, 'fileuni-bin');
-const metadataPath = path.join(binDir, 'fileuni-target.json');
+const metadataPath = path.join(binDir, 'installed-target.json');
+
+function logPrefix() {
+  return `[${manifest.package.name}]`;
+}
+
+function packageDisplayName() {
+  return manifest.package.display_name || manifest.package.name;
+}
+
+function envName(suffix) {
+  return `${manifest.package.env_prefix}_${suffix}`;
+}
+
+function npmConfigName(suffix) {
+  return `npm_config_${manifest.package.npm_config_prefix}_${suffix.toLowerCase()}`;
+}
+
+function envValue(suffix) {
+  return process.env[envName(suffix)] || process.env[npmConfigName(suffix)] || null;
+}
 
 function normalizeLibc(input) {
   if (!input) {
@@ -26,7 +46,7 @@ function normalizeLibc(input) {
 }
 
 function detectLibc() {
-  const envLibc = normalizeLibc(process.env.FILEUNI_NPM_LIBC || process.env.npm_config_fileuni_libc);
+  const envLibc = normalizeLibc(envValue('LIBC'));
   if (envLibc) {
     return envLibc;
   }
@@ -51,11 +71,11 @@ function supportedTargets() {
 }
 
 function selectTarget() {
-  const explicitTarget = process.env.FILEUNI_NPM_TARGET || process.env.npm_config_fileuni_target;
+  const explicitTarget = envValue('TARGET');
   if (explicitTarget) {
     const match = manifest.targets.find((entry) => entry.target === explicitTarget);
     if (!match) {
-      throw new Error(`Unsupported FILEUNI_NPM_TARGET: ${explicitTarget}. Supported targets: ${supportedTargets().join(', ')}`);
+      throw new Error(`Unsupported ${envName('TARGET')}: ${explicitTarget}. Supported targets: ${supportedTargets().join(', ')}`);
     }
     return match;
   }
@@ -63,7 +83,7 @@ function selectTarget() {
   const libc = detectLibc();
   const candidates = manifest.targets.filter((entry) => entry.os === process.platform && entry.arch === process.arch);
   if (candidates.length === 0) {
-    throw new Error(`Unsupported platform: ${process.platform}/${process.arch}. Supported targets: ${supportedTargets().join(', ')}`);
+    throw new Error(`Unsupported platform for ${packageDisplayName()}: ${process.platform}/${process.arch}. Supported targets: ${supportedTargets().join(', ')}`);
   }
 
   if (process.platform !== 'linux') {
@@ -84,13 +104,17 @@ function selectTarget() {
   return candidates[0];
 }
 
-function binaryPathFor(entry) {
-  return entry.binary_name.endsWith('.exe') ? `${binaryBasePath}.exe` : binaryBasePath;
+function targetInstallPath(entry) {
+  return path.join(binDir, entry.installed_rel_path);
+}
+
+function targetExists(targetPath) {
+  return fs.existsSync(targetPath);
 }
 
 async function readInstalledMetadata() {
   try {
-    const raw = await fsp.readFile(metadataPath, 'utf-8');
+    const raw = await fsp.readFile(metadataPath, { encoding: 'utf-8' });
     return JSON.parse(raw);
   } catch (error) {
     if (error && error.code === 'ENOENT') {
@@ -109,7 +133,7 @@ async function writeInstalledMetadata(entry) {
 }
 
 function releaseBaseUrl() {
-  const customBaseUrl = process.env.FILEUNI_NPM_BASE_URL;
+  const customBaseUrl = envValue('BASE_URL');
   if (customBaseUrl) {
     return customBaseUrl.replace(/\/$/, '');
   }
@@ -120,41 +144,80 @@ function releaseAssetUrl(entry) {
   return `${releaseBaseUrl()}/releases/download/${manifest.release_tag}/${entry.asset_name}`;
 }
 
-async function downloadAsset(entry, zipPath) {
+async function downloadAsset(entry, downloadPath) {
   const response = await fetch(releaseAssetUrl(entry));
   if (!response.ok) {
     throw new Error(`Failed to download ${entry.asset_name}: HTTP ${response.status} ${response.statusText}`);
   }
 
   const buffer = Buffer.from(await response.arrayBuffer());
-  await fsp.writeFile(zipPath, buffer);
+  await fsp.writeFile(downloadPath, buffer);
+}
+
+async function copyExtractedTarget(extractDir, entry, targetPath) {
+  const extractedPath = path.join(extractDir, entry.installed_rel_path);
+  if (!targetExists(extractedPath)) {
+    throw new Error(`Downloaded archive does not contain ${entry.installed_rel_path}`);
+  }
+
+  await fsp.rm(targetPath, { recursive: true, force: true });
+  await fsp.mkdir(path.dirname(targetPath), { recursive: true });
+
+  const stat = await fsp.stat(extractedPath);
+  if (stat.isDirectory()) {
+    await fsp.cp(extractedPath, targetPath, { recursive: true, force: true });
+    return;
+  }
+
+  await fsp.copyFile(extractedPath, targetPath);
+}
+
+async function installFromZip(entry, downloadPath, targetPath) {
+  const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), `${manifest.package.name}-`));
+
+  try {
+    const extractDir = path.join(tmpDir, 'extract');
+    await fsp.mkdir(extractDir, { recursive: true });
+    const archive = new AdmZip(downloadPath);
+    archive.extractAllTo(extractDir, true);
+    await copyExtractedTarget(extractDir, entry, targetPath);
+  } finally {
+    await fsp.rm(tmpDir, { recursive: true, force: true });
+  }
+}
+
+async function installFromFile(entry, downloadPath, targetPath) {
+  await fsp.rm(targetPath, { recursive: true, force: true });
+  await fsp.mkdir(path.dirname(targetPath), { recursive: true });
+  await fsp.copyFile(downloadPath, targetPath);
 }
 
 async function installTarget(entry) {
   await fsp.mkdir(binDir, { recursive: true });
-  const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'fileuni-npm-'));
-  const zipPath = path.join(tmpDir, 'fileuni.zip');
+  const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), `${manifest.package.name}-download-`));
+  const targetPath = targetInstallPath(entry);
+  const downloadPath = path.join(tmpDir, entry.asset_name);
 
   try {
-    await downloadAsset(entry, zipPath);
+    await downloadAsset(entry, downloadPath);
 
-    const extractDir = path.join(tmpDir, 'extract');
-    await fsp.mkdir(extractDir, { recursive: true });
-    const archive = new AdmZip(zipPath);
-    archive.extractAllTo(extractDir, true);
-
-    const targetBinary = binaryPathFor(entry);
-    const extractedBinary = path.join(extractDir, entry.binary_name);
-    if (!fs.existsSync(extractedBinary)) {
-      throw new Error(`Downloaded archive does not contain ${entry.binary_name}`);
+    if (entry.asset_format === 'zip') {
+      await installFromZip(entry, downloadPath, targetPath);
+    } else if (entry.asset_format === 'file') {
+      await installFromFile(entry, downloadPath, targetPath);
+    } else {
+      throw new Error(`Unsupported asset format: ${entry.asset_format}`);
     }
 
-    await fsp.copyFile(extractedBinary, targetBinary);
-    if (!entry.binary_name.endsWith('.exe')) {
-      await fsp.chmod(targetBinary, 0o755);
+    if (entry.launch_strategy === 'exec' && targetExists(targetPath)) {
+      const targetStat = await fsp.stat(targetPath);
+      if (targetStat.isFile()) {
+        await fsp.chmod(targetPath, 0o755);
+      }
     }
+
     await writeInstalledMetadata(entry);
-    return targetBinary;
+    return { entry, targetPath };
   } finally {
     await fsp.rm(tmpDir, { recursive: true, force: true });
   }
@@ -162,18 +225,60 @@ async function installTarget(entry) {
 
 async function ensureInstalled() {
   const entry = selectTarget();
-  const targetBinary = binaryPathFor(entry);
+  const targetPath = targetInstallPath(entry);
   const metadata = await readInstalledMetadata();
 
-  if (metadata && metadata.target === entry.target && fs.existsSync(targetBinary)) {
-    return targetBinary;
+  if (metadata && metadata.target === entry.target && targetExists(targetPath)) {
+    return { entry, targetPath };
   }
 
   return installTarget(entry);
 }
 
+function waitForChild(child) {
+  return new Promise((resolve, reject) => {
+    child.on('error', reject);
+    child.on('exit', (code, signal) => {
+      if (signal) {
+        process.kill(process.pid, signal);
+        return;
+      }
+      resolve(code ?? 0);
+    });
+  });
+}
+
+async function launchInstalled(args = []) {
+  const { entry, targetPath } = await ensureInstalled();
+
+  if (entry.launch_strategy === 'open') {
+    if (process.platform !== 'darwin') {
+      throw new Error(`launch_strategy=open is only supported on macOS for ${packageDisplayName()}`);
+    }
+
+    const openArgs = ['-n', targetPath];
+    if (args.length > 0) {
+      openArgs.push('--args', ...args);
+    }
+
+    const child = spawn('open', openArgs, { stdio: 'inherit' });
+    return waitForChild(child);
+  }
+
+  if (entry.launch_strategy === 'exec') {
+    const child = spawn(targetPath, args, { stdio: 'inherit' });
+    return waitForChild(child);
+  }
+
+  throw new Error(`Unsupported launch strategy: ${entry.launch_strategy}`);
+}
+
 module.exports = {
   ensureInstalled,
+  envName,
+  launchInstalled,
+  logPrefix,
+  packageDisplayName,
   selectTarget,
   supportedTargets,
 };

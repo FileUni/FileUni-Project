@@ -13,69 +13,9 @@ def load_json(path: Path) -> dict:
 
 
 def write_json(path: Path, data: dict) -> None:
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-
-
-def normalize_arch(arch_raw: str) -> str:
-    if arch_raw == "x86_64":
-        return "x86_64"
-    if arch_raw == "i686":
-        return "x86_32"
-    if arch_raw in {"aarch64", "arm64"}:
-        return "aarch64"
-    return arch_raw
-
-
-def detect_os_default(target: str) -> str:
-    if "windows" in target:
-        return "windows"
-    if "apple-darwin" in target:
-        return "macos"
-    if "linux-android" in target:
-        return "android"
-    if "freebsd" in target:
-        return "freebsd"
-    if "linux" in target:
-        return "linux"
-    return "unknown"
-
-
-def detect_libc_default(target: str) -> str:
-    if "musl" in target:
-        return "musl"
-    if "gnu" in target:
-        return "gnu"
-    if "msvc" in target:
-        return "msvc"
-    if "darwin" in target:
-        return "darwin"
-    if "android" in target:
-        return "android"
-    if "freebsd" in target:
-        return "freebsd"
-    return "native"
-
-
-def cli_base(target: str, variant: str) -> str:
-    arch = normalize_arch(target.split("-")[0])
-
-    if variant == "default":
-        return f"FileUni-cli-{arch}-{detect_os_default(target)}-{detect_libc_default(target)}"
-    if variant == "android":
-        return f"FileUni-cli-{arch}-android-cli"
-    if variant == "freebsd":
-        return f"FileUni-cli-{arch}-freebsd-freebsd"
-    raise ValueError(f"Unknown CLI variant: {variant}")
-
-
-def asset_name_for_target(target: str, binary_name: str) -> str:
-    if "linux-android" in target:
-        return f"{cli_base(target, 'android')}.zip"
-    if "freebsd" in target:
-        return f"{cli_base(target, 'freebsd')}.zip"
-    if target.endswith("windows-msvc"):
-        return f"{cli_base(target, 'default')}.exe.zip"
-    return f"{cli_base(target, 'default')}.zip"
+    path.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
 
 
 def copy_template(src: Path, dst: Path, executable: bool = False) -> None:
@@ -92,7 +32,7 @@ def build_package(args: argparse.Namespace) -> int:
     license_path = Path(args.license).resolve()
     readme_path = Path(args.readme).resolve()
 
-    package_meta = config["package"]
+    package_meta = dict(config["package"])
     package_dir = output_dir / package_meta["name"]
     bin_dir = package_dir / "bin"
     scripts_dir = package_dir / "scripts"
@@ -100,21 +40,22 @@ def build_package(args: argparse.Namespace) -> int:
     bin_dir.mkdir(parents=True, exist_ok=True)
     scripts_dir.mkdir(parents=True, exist_ok=True)
 
-    targets = []
-    for entry in config["targets"]:
-        generated = dict(entry)
-        generated["asset_name"] = asset_name_for_target(entry["target"], entry["binary_name"])
-        targets.append(generated)
+    targets = [dict(entry) for entry in config["targets"]]
+
+    repository = {
+        "type": "git",
+        "url": f"https://github.com/{config['repository']}",
+    }
+    repository_directory = package_meta.get("repository_directory")
+    if repository_directory:
+        repository["directory"] = repository_directory
 
     package_json = {
         "name": package_meta["name"],
         "version": args.version,
         "description": package_meta["description"],
         "license": "UNLICENSED",
-        "repository": {
-            "type": "git",
-            "url": "https://github.com/FileUni/FileUni-Project",
-        },
+        "repository": repository,
         "homepage": "https://fileuni.com",
         "bugs": {
             "url": "https://github.com/FileUni/FileUni-WorkSpace/issues",
@@ -125,27 +66,26 @@ def build_package(args: argparse.Namespace) -> int:
             "README.md",
             "LICENSE",
         ],
-        "bin": {
-            "fileuni": "bin/fileuni.js"
-        },
+        "bin": {package_meta["bin_name"]: "bin/launcher.js"},
         "scripts": {
-            "postinstall": "node ./scripts/postinstall.cjs"
+            "postinstall": "node ./scripts/postinstall.cjs",
         },
         "dependencies": {
-            "adm-zip": "^0.5.16"
+            "adm-zip": "^0.5.16",
         },
         "engines": {
-            "node": ">=18.0.0"
+            "node": ">=18.0.0",
         },
         "publishConfig": {
-            "access": "public"
-        }
+            "access": "public",
+        },
     }
 
     runtime_manifest = {
         "repository": config["repository"],
         "release_tag": args.release_tag,
         "version": args.version,
+        "package": package_meta,
         "targets": targets,
     }
 
@@ -153,14 +93,22 @@ def build_package(args: argparse.Namespace) -> int:
     write_json(scripts_dir / "fileuni-manifest.json", runtime_manifest)
     shutil.copy2(license_path, package_dir / "LICENSE")
     shutil.copy2(readme_path, package_dir / "README.md")
-    copy_template(templates_dir / "bin-fileuni.js", bin_dir / "fileuni.js", executable=True)
-    copy_template(templates_dir / "fileuni-common.cjs", scripts_dir / "fileuni-common.cjs")
-    copy_template(templates_dir / "postinstall.cjs", scripts_dir / "postinstall.cjs", executable=True)
+    copy_template(
+        templates_dir / "bin-fileuni.js", bin_dir / "launcher.js", executable=True
+    )
+    copy_template(
+        templates_dir / "fileuni-common.cjs", scripts_dir / "fileuni-common.cjs"
+    )
+    copy_template(
+        templates_dir / "postinstall.cjs",
+        scripts_dir / "postinstall.cjs",
+        executable=True,
+    )
     return 0
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Build the single fileuni npm package")
+    parser = argparse.ArgumentParser(description="Build a FileUni npm package")
     parser.add_argument("--config", required=True)
     parser.add_argument("--templates", required=True)
     parser.add_argument("--readme", required=True)
