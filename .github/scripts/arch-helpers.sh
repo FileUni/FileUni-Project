@@ -155,6 +155,9 @@ fileuni_gui_base() {
     ios-app)
       fileuni_build_base "gui" "${arch}" "ios" "app"
       ;;
+    macos-app)
+      fileuni_build_base "gui" "${arch}" "macos" "app"
+      ;;
     *)
       printf 'Unknown gui base variant: %s\n' "${variant}" >&2
       return 1

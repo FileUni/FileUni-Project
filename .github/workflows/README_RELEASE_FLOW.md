@@ -5,7 +5,8 @@
 - Upstream trigger in WorkSpace: `.github/workflows/trigger-project-release.yml`
 - Downstream build/publish workflow in Project: `FileUni-release.yml`
 - Required secret in Project: `FILEUNI_WORKSPACE_PAT`
-- npm target manifest: `.github/npm/binary-targets.json`
+- CLI npm target manifest: `.github/npm/binary-targets.json`
+- GUI npm target manifest: `.github/npm/gui-targets.json`
 - npm package builder: `.github/scripts/build_npm_package.py`
 - npm package templates: `.github/npm/templates/`
 
@@ -24,9 +25,9 @@
 The final GitHub release `tag_name` and display `name` are resolved in this order:
 
 1. `release_name` input, if it is non-empty
-2. `trigger_mode=tag` → `FileUni-v...`
-3. `trigger_mode=nightly` → `nightly_YYYYMMDD_HHMMSS`
-4. `trigger_mode=manual` → `manually_YYYYMMDD_HHMMSS`
+2. `trigger_mode=tag` -> `FileUni-v...`
+3. `trigger_mode=nightly` -> `nightly_YYYYMMDD_HHMMSS`
+4. `trigger_mode=manual` -> `manually_YYYYMMDD_HHMMSS`
 
 Timestamps are generated in the `Asia/Shanghai` timezone.
 
@@ -34,30 +35,31 @@ Timestamps are generated in the `Asia/Shanghai` timezone.
 
 Important `workflow_dispatch` inputs:
 
-- `workspace_ref` — source ref in `FileUni-WorkSpace`
-- `release_name` — optional manual override for the release name
-- `trigger_mode` — `manual`, `tag`, or `nightly`
-- `build_mode` — `full` or `minimal`
-- `build_target` — `cli`, `gui`, or `cli+gui`
-- `prerelease` — whether the GitHub release is marked as pre-release
-- `enable_upx` — whether UPX-compressed copies are produced where supported
+- `workspace_ref` - source ref in `FileUni-WorkSpace`
+- `release_name` - optional manual override for the release name
+- `trigger_mode` - `manual`, `tag`, or `nightly`
+- `build_mode` - `full` or `minimal`
+- `build_target` - `cli`, `gui`, or `cli+gui`
+- `prerelease` - whether the GitHub release is marked as pre-release
+- `enable_upx` - whether UPX-compressed copies are produced where supported
 
 ## Stages
 
-1. resolve-matrix — Resolve source ref, release metadata, and build matrix
-2. build-frontends — Build CLI and GUI frontend assets from WorkSpace
-3. build-cli — Build CLI artifacts across cargo-dist, cross, Android, BSD, and package formats
-4. build-gui — Build GUI artifacts across desktop Tauri, Android, and iOS paths
-5. publish — Collect standardized `FileUni-*` artifacts, generate release notes, and publish the GitHub Release
-6. update-package-indexes — Update Homebrew tap, Scoop bucket, and Nix package sources in WorkSpace after a tag release
-7. publish-npm — Build and publish the single `fileuni` npm package after the GitHub Release is available
+1. resolve-matrix - Resolve source ref, release metadata, and build matrix
+2. build-frontends - Build CLI and GUI frontend assets from WorkSpace
+3. build-cli - Build CLI artifacts across cargo-dist, cross, Android, BSD, and package formats
+4. build-gui - Build GUI artifacts across desktop Tauri, Android, and iOS paths
+5. publish - Collect standardized `FileUni-*` artifacts, generate release notes, and publish the GitHub Release
+6. update-package-indexes - Update Homebrew tap, Scoop bucket, and Nix package sources for CLI and GUI after a full tag release
+7. publish-npm - Build and publish the `fileuni` and `fileuni-gui` npm packages after the GitHub Release is available
 
 ## Artifact Naming
 
 - Final release assets are standardized as `FileUni-*`
 - Architecture, OS, and libc naming are centralized in `.github/scripts/arch-helpers.sh`
 - The publish step removes non-standard filenames before uploading release assets
-- The npm package downloads those same standardized GitHub Release assets during `postinstall`
+- The npm packages download those same standardized GitHub Release assets during `postinstall`
+- GUI macOS releases now publish both signed-download-friendly `.dmg` assets and portable `.app.zip` assets for package-manager reuse
 
 ## Build Coverage
 
@@ -67,10 +69,12 @@ The exact matrix is resolved from `.github/build_matrix.jsonc`, but the workflow
 - CLI Android builds
 - CLI FreeBSD builds
 - Linux package builds via nFPM
-- npm single-package distribution for Linux `gnu` / `musl`, Windows, macOS, Android, and FreeBSD
-- Homebrew tap updates for macOS and Linux CLI assets
-- Scoop bucket updates for Windows CLI assets
-- Nix package repo updates for Linux and macOS CLI assets
+- npm single-package distribution for CLI on Linux `gnu` / `musl`, Windows, macOS, Android, and FreeBSD
+- npm desktop-package distribution for GUI on Windows, Linux, and macOS
+- Homebrew formula updates for macOS and Linux CLI assets
+- Homebrew cask updates for macOS GUI assets
+- Scoop bucket updates for Windows CLI and GUI assets
+- Nix package repo updates for CLI on Linux and macOS, and GUI on Linux
 - GUI desktop Tauri builds
 - GUI Android APK builds
 - GUI iOS IPA packaging
@@ -78,23 +82,25 @@ The exact matrix is resolved from `.github/build_matrix.jsonc`, but the workflow
 ## npm Publish Rules
 
 - npm publish is enabled only when `build_mode=full`
-- Homebrew, Scoop, and Nix index updates run only for `trigger_mode=tag` releases
-- npm publish requires CLI builds to be enabled
-- npm publish runs after the GitHub Release has been published, because the npm package downloads release assets by `release_tag`
+- Homebrew, Scoop, and Nix index updates run only for `trigger_mode=tag` releases with both CLI and GUI builds enabled
+- npm publish runs after the GitHub Release has been published, because the npm packages download release assets by `release_tag`
 - npm publish uses npm Trusted Publisher with GitHub Actions OIDC
 - no `NPM_TOKEN` secret is required for npm publishing
 - the npm package settings must trust `FileUni/FileUni-Project` and the `FileUni-release.yml` workflow
-- only one npm package is published: `fileuni`
-- prerelease versions are published with a non-`latest` npm dist-tag derived from the semver prerelease label, while stable versions use `latest`
-- the package auto-detects the current platform during `postinstall`
-- Linux defaults to `gnu` when detection is ambiguous, and users can override with `FILEUNI_NPM_LIBC` or `FILEUNI_NPM_TARGET`
+- stable versions are published with the `latest` npm dist-tag, while prerelease versions derive a non-`latest` dist-tag from the semver prerelease label
+- the CLI package name is `fileuni`
+- the GUI package name is `fileuni-gui`
+- both packages auto-detect the current platform during `postinstall`
+- Linux defaults to `gnu` when detection is ambiguous, and users can override the target with package-specific env vars
 
 ## npm Package Layout
 
-- Package name: `fileuni`
-- Binary target metadata is defined in `.github/npm/binary-targets.json`
-- The generated package contains only JavaScript launcher/install files and downloads the real CLI binary from GitHub Releases on demand
-- This design is fully independent from `packages/`, so `packages/` can be removed later without affecting release publishing
+- CLI package name: `fileuni`
+- GUI package name: `fileuni-gui`
+- CLI target metadata is defined in `.github/npm/binary-targets.json`
+- GUI target metadata is defined in `.github/npm/gui-targets.json`
+- The generated packages contain only JavaScript launch/install files and download the real release assets from GitHub Releases on demand
+- `packages/npm/` is retired; release publishing now uses `.github/npm/` only
 
 ## Notes
 

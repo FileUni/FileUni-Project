@@ -223,7 +223,7 @@ jobs:
           echo "cli_nfpm=${cli_nfpm}" >> "$GITHUB_OUTPUT"
           echo "gui_tauri=${gui_tauri}" >> "$GITHUB_OUTPUT"
           echo "gui_android=${gui_android}" >> "$GITHUB_OUTPUT"
-          if [ "${mode}" = "full" ] && [ "${has_cli}" = "true" ]; then
+          if [ "${mode}" = "full" ] && { [ "${has_cli}" = "true" ] || [ "${has_gui}" = "true" ]; }; then
             has_npm=true
           else
             has_npm=false
@@ -876,6 +876,18 @@ jobs:
           else
             ext="${file##*.}"
             cp "${file}" "dist/${base}.${ext}"
+            if [[ "${target}" == *apple-darwin* ]]; then
+              app_base="$(fileuni_gui_base "${target}" macos-app)"
+              app_bundle="$(find workspace/target/${target}/release/bundle -maxdepth 2 -type d -name '*.app' 2>/dev/null | head -1 || true)"
+              if [ -z "${app_bundle}" ] || [ ! -d "${app_bundle}" ]; then
+                app_bundle="$(find workspace/apps/gui/target/${target}/release/bundle -maxdepth 2 -type d -name '*.app' 2>/dev/null | head -1 || true)"
+              fi
+              if [ -z "${app_bundle}" ] || [ ! -d "${app_bundle}" ]; then
+                echo "::error::No macOS .app bundle found for target ${target}"
+                exit 1
+              fi
+              ditto -c -k --sequesterRsrc --keepParent "${app_bundle}" "dist/${app_base}.zip"
+            fi
           fi
 
       - name: Create GUI Windows UPX-compressed copy
@@ -1701,6 +1713,7 @@ jobs:
       !cancelled() &&
       needs.resolve-matrix.outputs.build_mode == 'full' &&
       needs.resolve-matrix.outputs.has_cli == 'true' &&
+      needs.resolve-matrix.outputs.has_gui == 'true' &&
       github.event.inputs.trigger_mode == 'tag' &&
       needs.publish.result == 'success'
       }}
@@ -1744,6 +1757,36 @@ jobs:
         with:
           name: cli-i686-pc-windows-msvc
           path: /tmp/package-index-artifacts/i686-pc-windows-msvc
+
+      - name: Download macOS x64 GUI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gui-x86_64-apple-darwin
+          path: /tmp/package-index-artifacts/x86_64-apple-darwin
+
+      - name: Download macOS arm64 GUI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gui-aarch64-apple-darwin
+          path: /tmp/package-index-artifacts/aarch64-apple-darwin
+
+      - name: Download Linux x64 GUI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gui-x86_64-unknown-linux-gnu
+          path: /tmp/package-index-artifacts/x86_64-unknown-linux-gnu
+
+      - name: Download Linux arm64 GUI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gui-aarch64-unknown-linux-gnu
+          path: /tmp/package-index-artifacts/aarch64-unknown-linux-gnu
+
+      - name: Download Windows x64 GUI artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: gui-x86_64-pc-windows-msvc
+          path: /tmp/package-index-artifacts/x86_64-pc-windows-msvc
 
       - name: Clone package repositories
         shell: bash
@@ -1804,9 +1847,9 @@ jobs:
             git -C "${repo_dir}" push origin HEAD:main
           }
 
-          commit_and_push /tmp/package-repos/homebrew-fileuni "chore(release): update formula for ${{ needs.resolve-matrix.outputs.publish_version }}"
-          commit_and_push /tmp/package-repos/scoop-fileuni "chore(release): update manifest for ${{ needs.resolve-matrix.outputs.publish_version }}"
-          commit_and_push /tmp/package-repos/nixpkgs-fileuni "chore(release): update package for ${{ needs.resolve-matrix.outputs.publish_version }}"
+          commit_and_push /tmp/package-repos/homebrew-fileuni "chore(release): update cli and gui packages for ${{ needs.resolve-matrix.outputs.publish_version }}"
+          commit_and_push /tmp/package-repos/scoop-fileuni "chore(release): update cli and gui packages for ${{ needs.resolve-matrix.outputs.publish_version }}"
+          commit_and_push /tmp/package-repos/nixpkgs-fileuni "chore(release): update cli and gui packages for ${{ needs.resolve-matrix.outputs.publish_version }}"
 
   publish-npm:
     needs: [resolve-matrix, publish]
@@ -1826,24 +1869,39 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Build npm package
+      - name: Build npm packages
         shell: bash
         env:
           PKG_VERSION: ${{ needs.resolve-matrix.outputs.publish_version }}
           RELEASE_TAG: ${{ needs.resolve-matrix.outputs.release_tag }}
         run: |
           set -euo pipefail
-          python3 .github/scripts/build_npm_package.py \
-            --config .github/npm/binary-targets.json \
-            --templates .github/npm/templates \
-            --readme .github/npm/README.package.md \
-            --license LICENSE \
-            --version "${PKG_VERSION}" \
-            --release-tag "${RELEASE_TAG}" \
-            --output /tmp/npm-root
+
+          if [ "${{ needs.resolve-matrix.outputs.has_cli }}" = "true" ]; then
+            python3 .github/scripts/build_npm_package.py \
+              --config .github/npm/binary-targets.json \
+              --templates .github/npm/templates \
+              --readme .github/npm/README.package.md \
+              --license LICENSE \
+              --version "${PKG_VERSION}" \
+              --release-tag "${RELEASE_TAG}" \
+              --output /tmp/npm-root
+          fi
+
+          if [ "${{ needs.resolve-matrix.outputs.has_gui }}" = "true" ]; then
+            python3 .github/scripts/build_npm_package.py \
+              --config .github/npm/gui-targets.json \
+              --templates .github/npm/templates \
+              --readme .github/npm/README.gui.package.md \
+              --license LICENSE \
+              --version "${PKG_VERSION}" \
+              --release-tag "${RELEASE_TAG}" \
+              --output /tmp/npm-root
+          fi
+
           find /tmp/npm-root -maxdepth 4 -type f | sort
 
-      - name: Publish npm package
+      - name: Publish npm packages
         shell: bash
         env:
           PKG_VERSION: ${{ needs.resolve-matrix.outputs.publish_version }}
@@ -1859,8 +1917,15 @@ jobs:
             fi
           fi
 
-          echo "Publishing fileuni@${PKG_VERSION} with npm tag ${npm_tag}"
-          npm publish /tmp/npm-root/fileuni --access public --provenance --tag "${npm_tag}"
+          if [ -d /tmp/npm-root/fileuni ]; then
+            echo "Publishing fileuni@${PKG_VERSION} with npm tag ${npm_tag}"
+            npm publish /tmp/npm-root/fileuni --access public --provenance --tag "${npm_tag}"
+          fi
+
+          if [ -d /tmp/npm-root/fileuni-gui ]; then
+            echo "Publishing fileuni-gui@${PKG_VERSION} with npm tag ${npm_tag}"
+            npm publish /tmp/npm-root/fileuni-gui --access public --provenance --tag "${npm_tag}"
+          fi
 
   build-pve-ct-template:
     needs: [resolve-matrix, build-cli]
