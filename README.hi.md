@@ -4,12 +4,14 @@
 
 # FileUni Project
 
-<p align="center">  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/वेबसाइट-fileuni.com-blue?style=for-the-badge" alt="वेबसाइट"></a>  <a href="https://docs.fileuni.com"><img src="https://img.shields.io/badge/डॉक्यूमेंटेशन-docs.fileuni.com-green?style=for-the-badge" alt="डॉक्यूमेंटेशन"></a>  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a> </p> 
+<p align="center">  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/वेबसाइट-fileuni.com-blue?style=for-the-badge" alt="वेबसाइट"></a>  <a href="https://docs.fileuni.com/nextcloud-compatibility"><img src="https://img.shields.io/badge/डॉक्यूमेंटेशन-docs.fileuni.com-green?style=for-the-badge" alt="डॉक्यूमेंटेशन"></a>  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a> </p> 
 > सूचना: यह प्रोजेक्ट अभी शुरुआती चरण में है। यह अस्थिर हो सकता है और फिलहाल केवल परीक्षण तथा शैक्षिक उपयोग के लिए है।
 
 FileUni एक अगली पीढ़ी का स्टोरेज और फ़ाइल प्रबंधन प्लेटफ़ॉर्म है, जिसे प्रदर्शन, सुरक्षा और मॉड्यूलर डिप्लॉयमेंट के लिए Rust में बनाया गया है।
 
 बहुत हल्के उपकरणों से लेकर पूर्ण सर्वरों तक, FileUni समर्पित हार्डवेयर के बिना NAS जैसी क्षमताएँ प्रदान करता है और CLI, GUI तथा web घटकों के लिए एक ही स्केलेबल कोडबेस बनाए रखता है।
+
+एक और महत्वपूर्ण विशेषता Nextcloud clients के साथ compatibility है। File management, favorites, shares, media-related flows, और WebDAV access को Nextcloud client ecosystem के साथ compatible बनाए रखने की दिशा में रखा गया है, जबकि Chat और Notes अभी follow-up roadmap में हैं।
 
 ## यह रिपॉजिटरी क्या है
 
@@ -27,6 +29,7 @@ FileUni एक अगली पीढ़ी का स्टोरेज और 
 - Rust-आधारित उच्च-प्रदर्शन architecture
 - अलग-अलग deployment आकारों के लिए modular design
 - dedicated hardware के बिना NAS features
+- WebDAV, file management, favorites, shares, और media flows के लिए Nextcloud client compatibility
 - FTP, SFTP, WebDAV और S3 सहित multi-protocol access
 - storage workloads के लिए reliability और security पर फोकस
 

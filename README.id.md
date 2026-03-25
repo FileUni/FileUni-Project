@@ -4,12 +4,14 @@
 
 # FileUni Project
 
-<p align="center">  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/Website-fileuni.com-blue?style=for-the-badge" alt="Website"></a>  <a href="https://docs.fileuni.com"><img src="https://img.shields.io/badge/Dokumentasi-docs.fileuni.com-green?style=for-the-badge" alt="Dokumentasi"></a>  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a> </p> 
+<p align="center">  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/Website-fileuni.com-blue?style=for-the-badge" alt="Website"></a>  <a href="https://docs.fileuni.com/nextcloud-compatibility"><img src="https://img.shields.io/badge/Dokumentasi-docs.fileuni.com-green?style=for-the-badge" alt="Dokumentasi"></a>  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a> </p> 
 > Pemberitahuan: Proyek ini masih dalam tahap awal. Proyek ini mungkin belum stabil dan saat ini hanya ditujukan untuk pengujian serta penggunaan edukasi.
 
 FileUni adalah platform penyimpanan dan manajemen file generasi berikutnya yang dibangun dengan Rust untuk performa, keamanan, dan deployment modular.
 
 Dari perangkat ultra-ringan hingga server penuh, FileUni dirancang untuk menghadirkan kemampuan seperti NAS tanpa membutuhkan perangkat keras khusus, dengan satu codebase yang dapat diskalakan untuk komponen CLI, GUI, dan web.
+
+Karakteristik penting lainnya adalah kompatibilitas dengan klien Nextcloud. Manajemen file, favorit, share, alur terkait media, dan akses WebDAV diposisikan agar tetap kompatibel dengan ekosistem klien Nextcloud, sementara Chat dan Notes masih berada di roadmap lanjutan.
 
 ## Tentang repositori ini
 
@@ -27,6 +29,7 @@ Workspace pengembangan utama berada di monorepo privat, dan beberapa komponen di
 - Arsitektur performa tinggi berbasis Rust
 - Desain modular untuk berbagai skala deployment
 - Fitur NAS tanpa perangkat keras khusus
+- Kompatibilitas klien Nextcloud untuk WebDAV, manajemen file, favorit, share, dan alur media
 - Akses multi-protokol termasuk FTP, SFTP, WebDAV, dan S3
 - Fokus pada keandalan dan keamanan untuk beban kerja storage
 

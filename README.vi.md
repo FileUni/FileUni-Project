@@ -4,12 +4,14 @@
 
 # FileUni Project
 
-<p align="center">  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/Website-fileuni.com-blue?style=for-the-badge" alt="Website"></a>  <a href="https://docs.fileuni.com"><img src="https://img.shields.io/badge/Tài_liệu-docs.fileuni.com-green?style=for-the-badge" alt="Tài liệu"></a>  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a> </p> 
+<p align="center">  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/Website-fileuni.com-blue?style=for-the-badge" alt="Website"></a>  <a href="https://docs.fileuni.com/nextcloud-compatibility"><img src="https://img.shields.io/badge/Tài_liệu-docs.fileuni.com-green?style=for-the-badge" alt="Tài liệu"></a>  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a> </p> 
 > Lưu ý: Dự án này vẫn đang ở giai đoạn đầu. Nó có thể chưa ổn định và hiện chỉ dành cho mục đích thử nghiệm và giáo dục.
 
 FileUni là nền tảng lưu trữ và quản lý tệp thế hệ mới được xây dựng bằng Rust, tập trung vào hiệu năng, bảo mật và triển khai theo mô-đun.
 
 Từ thiết bị siêu nhẹ đến máy chủ đầy đủ, FileUni cung cấp khả năng kiểu NAS mà không cần phần cứng chuyên dụng, đồng thời duy trì một codebase thống nhất có thể mở rộng cho CLI, GUI và các thành phần web.
+
+Một đặc điểm quan trọng khác là khả năng tương thích với client Nextcloud. Quản lý tệp, mục yêu thích, chia sẻ, các luồng liên quan đến media và truy cập WebDAV đều được định hướng để giữ tương thích với hệ sinh thái client Nextcloud, trong khi Chat và Notes vẫn nằm trong roadmap tiếp theo.
 
 ## Kho này là gì
 
@@ -27,6 +29,7 @@ Workspace phát triển chính nằm trong monorepo riêng tư và một số th
 - Kiến trúc hiệu năng cao dựa trên Rust
 - Thiết kế mô-đun cho nhiều quy mô triển khai
 - Tính năng NAS không cần phần cứng chuyên dụng
+- Khả năng tương thích với client Nextcloud cho WebDAV, quản lý tệp, mục yêu thích, chia sẻ và luồng media
 - Truy cập đa giao thức gồm FTP, SFTP, WebDAV và S3
 - Tập trung vào độ tin cậy và bảo mật cho bài toán lưu trữ
 

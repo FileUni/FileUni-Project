@@ -4,12 +4,14 @@
 
 # FileUni Project
 
-<p align="center">  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/Website-fileuni.com-blue?style=for-the-badge" alt="Website"></a>  <a href="https://docs.fileuni.com"><img src="https://img.shields.io/badge/Dokumentation-docs.fileuni.com-green?style=for-the-badge" alt="Dokumentation"></a>  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a> </p> 
+<p align="center">  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/Website-fileuni.com-blue?style=for-the-badge" alt="Website"></a>  <a href="https://docs.fileuni.com/de/nextcloud-compatibility"><img src="https://img.shields.io/badge/Dokumentation-docs.fileuni.com-green?style=for-the-badge" alt="Dokumentation"></a>  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a> </p> 
 > Hinweis: Dieses Projekt befindet sich noch in einem frühen Stadium. Es kann instabil sein und ist derzeit nur für Test- und Lernzwecke gedacht.
 
 FileUni ist eine Storage- und Dateiverwaltungsplattform der nächsten Generation, entwickelt in Rust für Leistung, Sicherheit und modulare Bereitstellung.
 
 Von sehr kleinen Geräten bis zu vollständigen Servern bietet FileUni NAS-ähnliche Funktionen ohne dedizierte Hardware und nutzt dabei eine skalierbare gemeinsame Codebasis für CLI, GUI und Web-Komponenten.
+
+Ein weiteres wichtiges Merkmal ist die Kompatibilität mit Nextcloud-Clients. Dateiverwaltung, Favoriten, Freigaben, medienbezogene Abläufe und WebDAV-Zugriff sollen mit dem Nextcloud-Client-Ökosystem kompatibel bleiben, während Chat und Notes Teil der weiteren Roadmap sind.
 
 ## Was dieses Repository ist
 
@@ -27,6 +29,7 @@ Die Hauptentwicklung erfolgt im privaten Monorepo; ausgewählte Komponenten werd
 - Hochleistungsarchitektur auf Rust-Basis
 - Modulares Design für verschiedene Einsatzgrößen
 - NAS-Funktionen ohne dedizierte Hardware
+- Nextcloud-Client-Kompatibilität für WebDAV, Dateiverwaltung, Favoriten, Freigaben und Medienabläufe
 - Multi-Protokoll-Zugriff mit FTP, SFTP, WebDAV und S3
 - Fokus auf Zuverlässigkeit und Sicherheit für Storage-Workloads
 

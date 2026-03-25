@@ -4,12 +4,14 @@
 
 # FileUni Project
 
-<p align="center">  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/官网-fileuni.com-blue?style=for-the-badge" alt="官网"></a>  <a href="https://docs.fileuni.com/zh-cn/"><img src="https://img.shields.io/badge/文档站-docs.fileuni.com-green?style=for-the-badge" alt="文档站"></a>  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a> </p> 
+<p align="center">  <a href="https://fileuni.com"><img src="https://img.shields.io/badge/官网-fileuni.com-blue?style=for-the-badge" alt="官网"></a>  <a href="https://docs.fileuni.com/zh-cn/nextcloud-compatibility"><img src="https://img.shields.io/badge/文档站-docs.fileuni.com-green?style=for-the-badge" alt="文档站"></a>  <a href="https://github.com/FileUni/FileUni-Project"><img src="https://img.shields.io/badge/GitHub-FileUni-black?style=for-the-badge&logo=github" alt="GitHub"></a>  <a href="https://hub.docker.com/r/fileuni/fileuni"><img src="https://img.shields.io/badge/Docker-fileuni-blue?style=for-the-badge&logo=docker" alt="Docker Hub"></a> </p> 
 > 提示：本项目仍处于早期阶段，可能不稳定，目前仅面向测试和学习用途。
 
 FileUni 是一个面向高性能、安全性与模块化部署的下一代 Rust 存储与文件管理平台。
 
 从超轻量设备到完整服务器，FileUni 以统一代码库提供类 NAS 能力，不依赖专用硬件，并可覆盖 CLI、GUI 与 Web 场景。
+
+另一个重要特色是兼容 Nextcloud 客户端。文件管理、收藏、分享、媒体相关流程以及 WebDAV 访问都以兼容 Nextcloud 客户端生态为目标，而 Chat 与 Notes 仍处于后续开发计划中。
 
 ## 这个仓库是什么
 
@@ -27,6 +29,7 @@ FileUni 的主要开发工作区位于私有 monorepo，本仓库会同步部分
 - 基于 Rust 的高性能架构
 - 面向不同部署规模的模块化设计
 - 无需专用硬件即可获得 NAS 能力
+- 兼容 Nextcloud 客户端的 WebDAV、文件管理、收藏、分享与媒体流程
 - 支持 FTP、SFTP、WebDAV、S3 等多协议访问
 - 面向存储场景的可靠性与安全性设计
 
