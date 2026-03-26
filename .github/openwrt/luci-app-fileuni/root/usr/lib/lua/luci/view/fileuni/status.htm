@@ -1,6 +1,10 @@
 <%
 local json = require "luci.jsonc"
-local backend = self.fileuni_backend or {}
+local view = self.fileuni_view or {}
+local language = view.language or {}
+local backend = view.backend or {}
+local labels = backend.labels or {}
+local language_buttons = language.buttons or {}
 local host = backend.host or ""
 local port = backend.port or "19000"
 local config_path = backend.config_path or "/etc/fileuni/config.toml"
@@ -8,7 +12,7 @@ local status_text = backend.status_text or "Unknown"
 local binary_text = backend.binary_text or "Unknown"
 local backend_hint = backend.backend_hint or ("http://<router-ip>:" .. port .. "/ui")
 local admin_reset_hint = backend.admin_reset_hint or ""
-local has_config = backend.has_config
+local config_detected_text = backend.config_detected_text or ""
 %>
 
 <script type="text/javascript">
@@ -30,32 +34,56 @@ local has_config = backend.has_config
 </script>
 
 <div class="cbi-section">
-	<h3><%:Backend Access%></h3>
+	<h3><%= pcdata(language.section_title or "Language") %></h3>
 	<div class="table">
 		<div class="tr">
-			<div class="td left" width="33%"><%:Service status%></div>
+			<div class="td left" width="33%"><%= pcdata(language.configured_label or "Configured language") %></div>
+			<div class="td left"><%= pcdata(language.configured_value or "Auto") %></div>
+		</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%= pcdata(language.effective_label or "Current page language") %></div>
+			<div class="td left"><%= pcdata(language.effective_value or "English") %></div>
+		</div>
+	</div>
+	<div style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+	<% for _, item in ipairs(language_buttons) do %>
+		<a
+			href="<%= pcdata(item.url) %>"
+			class="btn cbi-button <%= item.active and 'cbi-button-apply' or '' %>"
+			style="text-decoration: none; min-width: 5.5rem; text-align: center;"
+		><%= pcdata(item.label) %></a>
+	<% end %>
+	</div>
+	<p style="margin-top: 0.75rem;"><%= pcdata(language.hint or "") %></p>
+</div>
+
+<div class="cbi-section">
+	<h3><%= pcdata(labels.section_title or "Backend Access") %></h3>
+	<div class="table">
+		<div class="tr">
+			<div class="td left" width="33%"><%= pcdata(labels.service_status or "Service status") %></div>
 			<div class="td left"><%= pcdata(status_text) %></div>
 		</div>
 		<div class="tr">
-			<div class="td left" width="33%"><%:CLI binary%></div>
+			<div class="td left" width="33%"><%= pcdata(labels.cli_binary or "CLI binary") %></div>
 			<div class="td left"><%= pcdata(binary_text) %></div>
 		</div>
 		<div class="tr">
-			<div class="td left" width="33%"><%:Config file%></div>
+			<div class="td left" width="33%"><%= pcdata(labels.config_file or "Config file") %></div>
 			<div class="td left"><%= pcdata(config_path) %></div>
 		</div>
 		<div class="tr">
-			<div class="td left" width="33%"><%:Detected backend%></div>
+			<div class="td left" width="33%"><%= pcdata(labels.detected_backend or "Detected backend") %></div>
 			<div class="td left"><%= pcdata(backend_hint) %></div>
 		</div>
 		<div class="tr">
-			<div class="td left" width="33%"><%:Config detected%></div>
-			<div class="td left"><%= pcdata(has_config and "Yes" or "No, fallback port 19000 is used") %></div>
+			<div class="td left" width="33%"><%= pcdata(labels.config_detected or "Config detected") %></div>
+			<div class="td left"><%= pcdata(config_detected_text) %></div>
 		</div>
 	</div>
 	<div style="margin-top: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-		<input class="btn cbi-button cbi-button-apply" type="button" value="<%:Open Backend%>" onclick="fileuniOpenBackend()" />
-		<span><%:This opens the FileUni web UI in a new browser tab using the port from config.toml.%></span>
+		<input class="btn cbi-button cbi-button-apply" type="button" value="<%= pcdata(labels.open_backend or 'Open Backend') %>" onclick="fileuniOpenBackend()" />
+		<span><%= pcdata(labels.open_backend_hint or "") %></span>
 	</div>
 	<p style="margin-top: 0.75rem;"><%= pcdata(admin_reset_hint) %></p>
 </div>
