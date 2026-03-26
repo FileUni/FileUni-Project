@@ -128,8 +128,24 @@ fileuni_cli_base() {
     linux-packages)
       fileuni_build_base "cli" "${arch}" "linux" "$(fileuni_detect_linux_package_libc "${target}")"
       ;;
+    openwrt)
+      fileuni_build_base "cli" "${arch}" "openwrt" "musl"
+      ;;
     *)
       printf 'Unknown cli base variant: %s\n' "${variant}" >&2
+      return 1
+      ;;
+  esac
+}
+
+fileuni_is_openwrt_cli_target() {
+  local target="${1:-}"
+
+  case "${target}" in
+    x86_64-unknown-linux-musl|aarch64-unknown-linux-musl|i686-unknown-linux-musl|armv7-unknown-linux-musleabihf)
+      return 0
+      ;;
+    *)
       return 1
       ;;
   esac

@@ -1606,6 +1606,11 @@ jobs:
             mv "${p}" "packages/${base}.${ext}"
           done
 
+          if fileuni_is_openwrt_cli_target "${target}" && [ -f "packages/${base}.ipk" ]; then
+            openwrt_base="$(fileuni_cli_base "${target}" openwrt)"
+            cp "packages/${base}.ipk" "packages/${openwrt_base}.ipk"
+          fi
+
           ls -la packages/
 
       - name: Build OpenWrt LuCI package
