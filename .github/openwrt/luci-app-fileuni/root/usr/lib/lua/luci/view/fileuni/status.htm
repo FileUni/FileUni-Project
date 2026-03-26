@@ -34,27 +34,27 @@ local config_detected_text = backend.config_detected_text or ""
 </script>
 
 <div class="cbi-section">
-	<h3><%= pcdata(language.section_title or "Language") %></h3>
-	<div class="table">
-		<div class="tr">
-			<div class="td left" width="33%"><%= pcdata(language.configured_label or "Configured language") %></div>
-			<div class="td left"><%= pcdata(language.configured_value or "Auto") %></div>
+	<div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap;">
+		<div style="min-width: 14rem; flex: 1 1 16rem;">
+			<h3 style="margin: 0;"><%= pcdata(language.section_title or "Language") %></h3>
+			<p style="margin: 0.5rem 0 0; color: #666; line-height: 1.6;"><%= pcdata(language.hint or "") %></p>
 		</div>
-		<div class="tr">
-			<div class="td left" width="33%"><%= pcdata(language.effective_label or "Current page language") %></div>
-			<div class="td left"><%= pcdata(language.effective_value or "English") %></div>
+		<div style="margin-left: auto; min-width: 18rem; flex: 0 1 34rem; text-align: right;">
+			<div style="display: flex; justify-content: flex-end; gap: 0.45rem; align-items: center; flex-wrap: wrap;">
+			<% for _, item in ipairs(language_buttons) do %>
+				<a
+					href="<%= pcdata(item.url) %>"
+					class="btn cbi-button <%= item.active and 'cbi-button-apply' or '' %>"
+					style="text-decoration: none; min-width: 4.8rem; text-align: center;"
+				><%= pcdata(item.label) %></a>
+			<% end %>
+			</div>
+			<div style="margin-top: 0.7rem; color: #666; line-height: 1.6;">
+				<div><%= pcdata(language.configured_label or "Configured language") %>: <%= pcdata(language.configured_value or "Auto") %></div>
+				<div><%= pcdata(language.effective_label or "Current page language") %>: <%= pcdata(language.effective_value or "English") %></div>
+			</div>
 		</div>
 	</div>
-	<div style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
-	<% for _, item in ipairs(language_buttons) do %>
-		<a
-			href="<%= pcdata(item.url) %>"
-			class="btn cbi-button <%= item.active and 'cbi-button-apply' or '' %>"
-			style="text-decoration: none; min-width: 5.5rem; text-align: center;"
-		><%= pcdata(item.label) %></a>
-	<% end %>
-	</div>
-	<p style="margin-top: 0.75rem;"><%= pcdata(language.hint or "") %></p>
 </div>
 
 <div class="cbi-section">
