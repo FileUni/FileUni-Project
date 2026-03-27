@@ -25,6 +25,10 @@ trap cleanup EXIT
 mkdir -p "${stage_root}/pkgroot"
 cp -R "${template_root}/root/." "${stage_root}/pkgroot/"
 
+config_src="${stage_root}/fileuni-config"
+cp "${stage_root}/pkgroot/etc/config/fileuni" "${config_src}"
+rm -f "${stage_root}/pkgroot/etc/config/fileuni"
+
 chmod 0755 \
   "${stage_root}/pkgroot/etc/init.d/fileuni" \
   "${template_root}/scripts/postinstall.sh"
@@ -48,8 +52,9 @@ contents:
   - src: ${stage_root}/pkgroot/
     dst: /
     type: tree
-config_files:
-  - /etc/config/fileuni
+  - src: ${config_src}
+    dst: /etc/config/fileuni
+    type: config
 scripts:
   postinstall: ${template_root}/scripts/postinstall.sh
 EOF
