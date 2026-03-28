@@ -18,10 +18,10 @@ load_service_config() {
 	config_load "$SERVICE_NAME"
 	config_get_bool enabled main enabled 0
 	config_get runtime_dir main runtime_dir ""
-	config_get legacy_config_dir main config_dir ""
-	config_get legacy_app_data_dir main app_data_dir ""
-	[ -n "$runtime_dir" ] || runtime_dir="$legacy_app_data_dir"
-	[ -n "$runtime_dir" ] || runtime_dir="$legacy_config_dir"
+	config_get legacy_runtime_dir_from_config_dir main config_dir ""
+	config_get legacy_runtime_dir_from_app_data_dir main app_data_dir ""
+	[ -n "$runtime_dir" ] || runtime_dir="$legacy_runtime_dir_from_app_data_dir"
+	[ -n "$runtime_dir" ] || runtime_dir="$legacy_runtime_dir_from_config_dir"
 	[ -n "$runtime_dir" ] || runtime_dir="/var/lib/fileuni"
 	config_get work_dir main work_dir "$runtime_dir"
 }

@@ -97,7 +97,7 @@ If English isn't your first language, don't worry! We value your contributions r
 
 - [ ] No environment variables - All config from config files only
 - [ ] Config struct 100% matches `{runtime-dir}/config.toml`
-- [ ] No hardcoded paths - use `{APPDATADIR}` placeholder
+- [ ] No hardcoded paths - use `{RUNTIMEDIR}` placeholder
 - [ ] Module business params in module's `config.rs`
 
 ### File Manager Specific
