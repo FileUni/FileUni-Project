@@ -85,7 +85,7 @@ If English isn't your first language, don't worry! We value your contributions r
 
 ### Frontend (TypeScript/React/Astro)
 
-- [ ] Zero `any` types - Use `bun run gen-api` for auto-generated types
+- [ ] Zero `any` in frontend code - Prefer generated API types, inferred types, explicit interfaces, and narrow unknown values at the boundary
 - [ ] ESLint gate - `bun run lint` must pass with zero errors
 - [ ] Type check - `bun run typecheck` must pass with zero errors
 - [ ] Astro diagnostics - `bun run check` must pass with zero errors and warnings
@@ -94,6 +94,10 @@ If English isn't your first language, don't worry! We value your contributions r
 - [ ] Use `openapi-fetch` from `src/lib/api.ts`
 - [ ] All `t('key')` must exist in all language files
 - [ ] Keep strict TypeScript settings enabled - do not relax `strict`, `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, or `noPropertyAccessFromIndexSignature`
+- [ ] Follow React/Astro/TypeScript best practices - stable hook dependencies, semantic HTML, strict prop typing, safe null handling, and no unsafe or deprecated patterns
+- [ ] Remove non-standard frontend code when touching it - prefer typed helpers, explicit state transitions, and predictable data flow over ad-hoc patches
+- [ ] Improve reuse instead of copying logic - shared business logic should live in one hook, utility, or component instead of being duplicated across multiple files
+- [ ] Keep a single source of truth for frontend workflows - do not reimplement the same validation, decision, or mapping logic in multiple places
 - [ ] Keep hooks and accessibility lint gates green - do not bypass `react-hooks` or `jsx-a11y` rules
 - [ ] All `button` elements must declare `type`
 - [ ] Do not use array index as React list key when a stable business key exists
