@@ -47,7 +47,6 @@ homepage: https://github.com/FileUni
 license: MIT
 depends:
   - luci-base
-  - fileuni
 contents:
   - src: ${stage_root}/pkgroot/
     dst: /

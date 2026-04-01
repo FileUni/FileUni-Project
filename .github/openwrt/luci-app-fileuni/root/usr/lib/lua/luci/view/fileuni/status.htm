@@ -10,6 +10,10 @@ local port = backend.port or "19000"
 local config_path = backend.config_path or "/var/lib/fileuni/config.toml"
 local status_text = backend.status_text or "Unknown"
 local binary_text = backend.binary_text or "Unknown"
+local binary_missing = backend.binary_missing or false
+local binary_missing_notice = backend.binary_missing_notice or ""
+local binary_download_url = backend.binary_download_url or "https://fileuni.com"
+local binary_download_link = backend.binary_download_link or "Download FileUni CLI"
 local backend_hint = backend.backend_hint or ("http://<router-ip>:" .. port .. "/ui")
 local admin_reset_hint = backend.admin_reset_hint or ""
 local config_detected_text = backend.config_detected_text or ""
@@ -56,6 +60,16 @@ local config_detected_text = backend.config_detected_text or ""
 		</div>
 	</div>
 </div>
+
+<% if binary_missing then %>
+<div class="cbi-section" style="border-left: 3px solid #e74c3c; background: #fdf2f2;">
+	<h3 style="color: #c0392b; margin: 0 0 0.5rem;"><%= pcdata("CLI Binary Required") %></h3>
+	<p style="margin: 0 0 0.75rem; color: #333; line-height: 1.6;"><%= pcdata(binary_missing_notice) %></p>
+	<a href="<%= pcdata(binary_download_url) %>" target="_blank" rel="noopener" class="btn cbi-button cbi-button-apply" style="text-decoration: none;">
+		<%= pcdata(binary_download_link) %>
+	</a>
+</div>
+<% end %>
 
 <div class="cbi-section">
 	<h3><%= pcdata(labels.section_title or "Backend Access") %></h3>

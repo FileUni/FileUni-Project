@@ -121,6 +121,10 @@ local function build_backend_meta()
 		has_config = has_config,
 		status_text = running and tr("running") or tr("stopped"),
 		binary_text = binary_exists and tr("installed") or tr("missing"),
+		binary_missing = not binary_exists,
+		binary_missing_notice = tr("binary_missing_notice"),
+		binary_download_url = tr("binary_download_url"),
+		binary_download_link = tr("binary_download_link"),
 		backend_hint = use_browser_host
 			and ("http://<router-ip>:" .. port .. "/ui")
 			or ("http://" .. display_host .. ":" .. port .. "/ui"),
