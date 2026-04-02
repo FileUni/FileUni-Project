@@ -1860,8 +1860,8 @@ jobs:
             /tmp/package-repos/scoop-fileuni \
             /tmp/package-repos/nixpkgs-fileuni
           do
-            git -C "${repo_dir}" config user.name "github-actions[bot]"
-            git -C "${repo_dir}" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git -C "${repo_dir}" config user.name "FileUni"
+            git -C "${repo_dir}" config user.email "git@fileuni.com"
           done
 
       - name: Generate package repositories
