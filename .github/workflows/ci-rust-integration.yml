@@ -88,8 +88,31 @@ jobs:
           cargo build --locked -p fileuni --bin fileuni -p fileuni-integration-tests --tests --bins --message-format=json \
             > "$bundle_dir/build.jsonl"
 
-          install -m 755 target/debug/fileuni "$bundle_dir/fileuni"
-          install -m 755 target/debug/fileuni_e2e_server "$bundle_dir/fileuni_e2e_server"
+          install_compiler_artifact() {
+            local target_name="$1"
+            local destination_path="$2"
+            local executable_path
+
+            executable_path="$(jq -rs --arg target_name "$target_name" '
+              map(
+                select(
+                  .reason == "compiler-artifact"
+                  and .target.name == $target_name
+                  and (.target.kind[]? == "bin")
+                  and .profile.test == false
+                  and .executable != null
+                )
+                | .executable
+              )
+              | first // empty
+            ' "$bundle_dir/build.jsonl")"
+
+            test -n "$executable_path"
+            install -m 755 "$executable_path" "$destination_path"
+          }
+
+          install_compiler_artifact fileuni "$bundle_dir/fileuni"
+          install_compiler_artifact fileuni_e2e_server "$bundle_dir/fileuni_e2e_server"
 
           jq -r 'select(.reason == "compiler-artifact" and .profile.test == true and (.target.kind[]? == "test") and .executable != null) | [.target.name, .executable] | @tsv' "$bundle_dir/build.jsonl" \
             | while IFS=$'\t' read -r test_name executable_path; do
@@ -99,9 +122,13 @@ jobs:
           for test_name in \
             web_api_smoke \
             cli_runtime_smoke \
+            cli_edge_smoke \
             runtime_context_smoke \
+            runtime_action_matrix_smoke \
             backup_cli_smoke \
+            config_set_mode_smoke \
             gui_shared_commands_smoke \
+            gui_tooling_smoke \
             service_manager_smoke \
             web_api_low_resource_smoke \
             web_api_low_resource_restart_smoke \
@@ -152,12 +179,20 @@ jobs:
             test_name: web_api_smoke
           - job_name: cli-runtime-smoke
             test_name: cli_runtime_smoke
+          - job_name: cli-edge-smoke
+            test_name: cli_edge_smoke
           - job_name: runtime-context-smoke
             test_name: runtime_context_smoke
+          - job_name: runtime-action-matrix-smoke
+            test_name: runtime_action_matrix_smoke
           - job_name: backup-cli-smoke
             test_name: backup_cli_smoke
+          - job_name: config-set-mode-smoke
+            test_name: config_set_mode_smoke
           - job_name: gui-shared-commands-smoke
             test_name: gui_shared_commands_smoke
+          - job_name: gui-tooling-smoke
+            test_name: gui_tooling_smoke
           - job_name: service-manager-smoke
             test_name: service_manager_smoke
           - job_name: web-api-boundary-smoke
