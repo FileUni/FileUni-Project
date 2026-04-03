@@ -66,6 +66,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       workspace_ref: ${{ steps.meta.outputs.workspace_ref }}
+      workspace_sha: ${{ steps.meta.outputs.workspace_sha }}
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_timestamp: ${{ steps.meta.outputs.release_timestamp }}
       dist_tag: ${{ steps.meta.outputs.dist_tag }}
@@ -124,7 +125,9 @@ jobs:
           release_name_input="${{ github.event.inputs.release_name }}"
           prerelease_input="${{ github.event.inputs.prerelease }}"
           default_tag_timestamp="$(TZ=Asia/Shanghai date '+%Y%m%d%H%M%S')"
+          workspace_sha="$(git rev-parse HEAD)"
           echo "workspace_ref=${ref}" >> "$GITHUB_OUTPUT"
+          echo "workspace_sha=${workspace_sha}" >> "$GITHUB_OUTPUT"
 
           pkg_version="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fileuni") | .version')"
           release_timestamp=""
@@ -165,7 +168,7 @@ jobs:
           fi
 
           echo "release_tag=${release_tag}" >> "$GITHUB_OUTPUT"
-          echo "::notice::dist_tag=v${pkg_version}  pkg_version=${pkg_version}  publish_version=${publish_version}  release_tag=${release_tag}  ref=${ref}  trigger_mode=${trigger_mode:-manual}"
+          echo "::notice::dist_tag=v${pkg_version}  pkg_version=${pkg_version}  publish_version=${publish_version}  release_tag=${release_tag}  ref=${ref}  workspace_sha=${workspace_sha}  trigger_mode=${trigger_mode:-manual}"
 
       - name: Resolve build matrix
         id: matrix
@@ -2269,3 +2272,61 @@ jobs:
           fail_on_unmatched_files: false
           files: /tmp/release/*
           body_path: /tmp/release-notes.md
+
+  record-build-metadata:
+    needs: [resolve-matrix, publish, update-package-indexes, publish-npm]
+    if: ${{ always() && needs.publish.result == 'success' && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write build metadata
+        shell: bash
+        env:
+          WORKSPACE_REF: ${{ needs.resolve-matrix.outputs.workspace_ref }}
+          WORKSPACE_SHA: ${{ needs.resolve-matrix.outputs.workspace_sha }}
+          BUILD_MODE: ${{ needs.resolve-matrix.outputs.build_mode }}
+          BUILD_TARGET: ${{ github.event.inputs.build_target }}
+          PRERELEASE: ${{ github.event.inputs.prerelease }}
+          ENABLE_UPX: ${{ github.event.inputs.enable_upx }}
+          TRIGGER_MODE: ${{ github.event.inputs.trigger_mode }}
+          RELEASE_TAG: ${{ needs.resolve-matrix.outputs.release_tag }}
+          PUBLISH_VERSION: ${{ needs.resolve-matrix.outputs.publish_version }}
+          WORKFLOW_RUN_ID: ${{ github.run_id }}
+          WORKFLOW_RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/build-metadata
+          jq -n \
+            --arg workspace_ref "${WORKSPACE_REF}" \
+            --arg workspace_sha "${WORKSPACE_SHA}" \
+            --arg build_mode "${BUILD_MODE:-full}" \
+            --arg build_target "${BUILD_TARGET:-cli+gui}" \
+            --arg prerelease "${PRERELEASE}" \
+            --arg enable_upx "${ENABLE_UPX}" \
+            --arg trigger_mode "${TRIGGER_MODE}" \
+            --arg release_tag "${RELEASE_TAG}" \
+            --arg publish_version "${PUBLISH_VERSION}" \
+            --arg workflow_run_id "${WORKFLOW_RUN_ID}" \
+            --arg workflow_run_attempt "${WORKFLOW_RUN_ATTEMPT}" \
+            --arg recorded_at "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
+            '{
+              workspace_ref: $workspace_ref,
+              workspace_sha: $workspace_sha,
+              build_mode: $build_mode,
+              build_target: $build_target,
+              prerelease: $prerelease,
+              enable_upx: $enable_upx,
+              trigger_mode: $trigger_mode,
+              release_tag: $release_tag,
+              publish_version: $publish_version,
+              workflow_run_id: $workflow_run_id,
+              workflow_run_attempt: $workflow_run_attempt,
+              recorded_at: $recorded_at
+            }' > /tmp/build-metadata/build-metadata.json
+          jq . /tmp/build-metadata/build-metadata.json
+
+      - name: Upload build metadata artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-metadata
+          path: /tmp/build-metadata/build-metadata.json
+          retention-days: 90
