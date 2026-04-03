@@ -1,7 +1,7 @@
-name: FileUni Frontend Tests
+name: Official Site Private CI
 
-# This workflow is dispatched only when changes under frontends/ are detected
-# by FileUni-WorkSpace/.github/workflows/trigger-project-integration-tests.yml.
+# This workflow is dispatched only when changes under OfficialSitePrivate/ are detected
+# by FileUni-WorkSpace/.github/workflows/dispatch-project-ci.yml.
 
 on:
   workflow_dispatch:
@@ -15,14 +15,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: frontend-tests-${{ github.event.inputs.workspace_ref || github.run_id }}
+  group: ci-official-site-private-${{ github.event.inputs.workspace_ref || github.run_id }}
   cancel-in-progress: true
 
 env:
   WORKSPACE_REPO: FileUni/FileUni-WorkSpace
 
 jobs:
-  frontends-verify:
+  official-site-private-verify:
     runs-on: ubuntu-latest
     steps:
       - name: Resolve workspace ref
@@ -49,13 +49,14 @@ jobs:
         with:
           path: |
             ~/.bun/install/cache
-            workspace/frontends/node_modules
-          key: frontends-bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
+            workspace/OfficialSitePrivate/node_modules
+          key: official-site-private-bun-${{ runner.os }}-${{ hashFiles('workspace/OfficialSitePrivate/bun.lock') }}
           restore-keys: |
-            frontends-bun-${{ runner.os }}-
+            official-site-private-bun-${{ runner.os }}-
 
-      - name: Verify frontends project
-        working-directory: workspace/frontends
+      - name: Verify OfficialSitePrivate
+        working-directory: workspace/OfficialSitePrivate
         run: |
           bun install --frozen-lockfile
-          bun run verify
+          bun run check:i18n
+          bun run build

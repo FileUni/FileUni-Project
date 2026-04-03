@@ -1,0 +1,385 @@
+name: Rust Integration CI
+
+on:
+  workflow_dispatch:
+    inputs:
+      workspace_ref:
+        description: "Source ref in FileUni-WorkSpace (branch/tag/sha). Default: main"
+        required: false
+        default: "main"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-rust-integration-${{ github.event.inputs.workspace_ref || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  WORKSPACE_REPO: FileUni/FileUni-WorkSpace
+
+jobs:
+  base-suite:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Core HTTP and cloud smoke
+            tests: web_api_smoke user_account_smoke webdav_smoke nextcloud_smoke s3_smoke
+          - name: Feature and website smoke
+            tests: chat_smoke email_basic_smoke website_smoke website_proxy_smoke extension_startup_smoke domain_acme_ddns_smoke acme_ddns_callback_smoke
+          - name: File protocol smoke
+            tests: sftp_smoke ftp_smoke
+    steps:
+      - name: Resolve workspace ref
+        id: resolve-ref
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
+      - name: Sync favicon
+        run: bash workspace/script/fileSync.sh
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+          key: rust-ci-bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: |
+            rust-ci-bun-${{ runner.os }}-
+
+      - name: Build frontend assets
+        working-directory: workspace/frontends
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+          test -f dist/index.html
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            workspace -> target
+
+      - name: Run grouped smoke tests
+        working-directory: workspace
+        env:
+          CARGO_TERM_COLOR: always
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: bash apps/integration-tests/run-smoke-test.sh ${{ matrix.tests }}
+
+  postgres-suite:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Postgres plus database KV smoke
+            kv_backend: database
+            tests: web_api_smoke user_account_smoke nextcloud_smoke
+          - name: Postgres plus Redis KV smoke
+            kv_backend: redis
+            tests: web_api_smoke user_account_smoke nextcloud_smoke
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: fileuni_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fileuni_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Resolve workspace ref
+        id: resolve-ref
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
+      - name: Sync favicon
+        run: bash workspace/script/fileSync.sh
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+          key: rust-ci-bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: |
+            rust-ci-bun-${{ runner.os }}-
+
+      - name: Build frontend assets
+        working-directory: workspace/frontends
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+          test -f dist/index.html
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            workspace -> target
+
+      - name: Run grouped smoke tests
+        working-directory: workspace
+        env:
+          CARGO_TERM_COLOR: always
+          FILEUNI_TEST_DB_BACKEND: postgres
+          FILEUNI_TEST_KV_BACKEND: ${{ matrix.kv_backend }}
+          FILEUNI_TEST_KV_REDIS_URL: redis://127.0.0.1:6379/0
+          FILEUNI_TEST_POSTGRES_DSN: postgres://postgres:postgres@127.0.0.1:5432/fileuni_test
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: bash apps/integration-tests/run-smoke-test.sh ${{ matrix.tests }}
+
+  mail-suite:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Mail smoke
+            db_backend: sqlite
+            kv_backend: dashmap
+            tests: mail_docker_smoke
+          - name: Mail smoke with Postgres plus database KV
+            db_backend: postgres
+            kv_backend: database
+            tests: mail_docker_smoke
+          - name: Mail smoke with Postgres plus Redis KV
+            db_backend: postgres
+            kv_backend: redis
+            tests: mail_docker_smoke
+    services:
+      greenmail:
+        image: greenmail/standalone:2.1.7
+        env:
+          GREENMAIL_OPTS: >-
+            -Dgreenmail.setup.test.smtp
+            -Dgreenmail.setup.test.imap
+            -Dgreenmail.hostname=0.0.0.0
+            -Dgreenmail.users=smoke:mail-password@example.com
+        ports:
+          - 3025:3025
+          - 3143:3143
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: fileuni_test
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fileuni_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Resolve workspace ref
+        id: resolve-ref
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
+      - name: Sync favicon
+        run: bash workspace/script/fileSync.sh
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+          key: rust-ci-bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: |
+            rust-ci-bun-${{ runner.os }}-
+
+      - name: Build frontend assets
+        working-directory: workspace/frontends
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+          test -f dist/index.html
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            workspace -> target
+
+      - name: Run grouped smoke tests
+        working-directory: workspace
+        env:
+          CARGO_TERM_COLOR: always
+          FILEUNI_TEST_DB_BACKEND: ${{ matrix.db_backend }}
+          FILEUNI_TEST_KV_BACKEND: ${{ matrix.kv_backend }}
+          FILEUNI_TEST_KV_REDIS_URL: redis://127.0.0.1:6379/0
+          FILEUNI_TEST_POSTGRES_DSN: postgres://postgres:postgres@127.0.0.1:5432/fileuni_test
+          FILEUNI_TEST_MAIL_IMAP_HOST: 127.0.0.1
+          FILEUNI_TEST_MAIL_IMAP_PORT: 3143
+          FILEUNI_TEST_MAIL_SMTP_HOST: 127.0.0.1
+          FILEUNI_TEST_MAIL_SMTP_PORT: 3025
+          FILEUNI_TEST_MAIL_USERNAME: smoke
+          FILEUNI_TEST_MAIL_PASSWORD: mail-password
+          FILEUNI_TEST_MAIL_ADDRESS: smoke@example.com
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: bash apps/integration-tests/run-smoke-test.sh ${{ matrix.tests }}
+
+  remote-mount-suite:
+    name: Remote mount smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve workspace ref
+        id: resolve-ref
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          ref="${{ github.event.inputs.workspace_ref }}"
+          echo "ref=${ref:-main}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ steps.resolve-ref.outputs.ref }}
+          token: ${{ secrets.FILEUNI_WORKSPACE_PAT }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
+      - name: Install rclone
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rclone
+
+      - name: Sync favicon
+        run: bash workspace/script/fileSync.sh
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cache Bun
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            workspace/frontends/node_modules
+          key: rust-ci-bun-${{ runner.os }}-${{ hashFiles('workspace/frontends/bun.lock') }}
+          restore-keys: |
+            rust-ci-bun-${{ runner.os }}-
+
+      - name: Build frontend assets
+        working-directory: workspace/frontends
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+          test -f dist/index.html
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            workspace -> target
+
+      - name: Run remote mount smoke test
+        working-directory: workspace
+        env:
+          CARGO_TERM_COLOR: always
+          RUST_BACKTRACE: 1
+          RUST_TEST_THREADS: 1
+        run: bash apps/integration-tests/run-smoke-test.sh remote_mount_rclone_smoke

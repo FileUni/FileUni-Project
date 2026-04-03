@@ -1,7 +1,7 @@
-name: FileUni Official Site Private Tests
+name: Official Site Docs CI
 
-# This workflow is dispatched only when changes under OfficialSitePrivate/ are detected
-# by FileUni-WorkSpace/.github/workflows/trigger-project-integration-tests.yml.
+# This workflow is dispatched only when changes under OfficialSiteDocs/ are detected
+# by FileUni-WorkSpace/.github/workflows/dispatch-project-ci.yml.
 
 on:
   workflow_dispatch:
@@ -15,14 +15,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: official-site-private-tests-${{ github.event.inputs.workspace_ref || github.run_id }}
+  group: ci-official-site-docs-${{ github.event.inputs.workspace_ref || github.run_id }}
   cancel-in-progress: true
 
 env:
   WORKSPACE_REPO: FileUni/FileUni-WorkSpace
 
 jobs:
-  official-site-private-verify:
+  official-site-docs-build:
     runs-on: ubuntu-latest
     steps:
       - name: Resolve workspace ref
@@ -49,14 +49,13 @@ jobs:
         with:
           path: |
             ~/.bun/install/cache
-            workspace/OfficialSitePrivate/node_modules
-          key: official-site-private-bun-${{ runner.os }}-${{ hashFiles('workspace/OfficialSitePrivate/bun.lock') }}
+            workspace/OfficialSiteDocs/node_modules
+          key: official-site-docs-bun-${{ runner.os }}-${{ hashFiles('workspace/OfficialSiteDocs/bun.lock') }}
           restore-keys: |
-            official-site-private-bun-${{ runner.os }}-
+            official-site-docs-bun-${{ runner.os }}-
 
-      - name: Verify OfficialSitePrivate
-        working-directory: workspace/OfficialSitePrivate
+      - name: Build OfficialSiteDocs
+        working-directory: workspace/OfficialSiteDocs
         run: |
           bun install --frozen-lockfile
-          bun run check:i18n
           bun run build
