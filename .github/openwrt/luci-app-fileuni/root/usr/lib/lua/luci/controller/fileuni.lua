@@ -32,12 +32,38 @@ local function failure_message(i18n, lang, result)
 		return i18n.translate(lang, "release_fetch_failed")
 	end
 
+	if code == "download_tool_missing" then
+		return i18n.translate(lang, "download_tool_missing")
+	end
+
+	if code == "opkg_missing" then
+		return i18n.translate(lang, "opkg_missing")
+	end
+
 	if code == "release_unavailable" then
 		return i18n.translate(lang, "release_unavailable")
 	end
 
 	if code == "release_no_matching_asset" then
 		return i18n.translate(lang, "release_no_matching_asset")
+	end
+
+	if code == "download_failed" then
+		local detail = compact_detail(result and result.detail)
+		local base = i18n.translate(lang, "download_failed")
+		return detail ~= "" and (base .. ": " .. detail) or base
+	end
+
+	if code == "opkg_install_failed" then
+		local detail = compact_detail(result and result.detail)
+		local base = i18n.translate(lang, "opkg_install_failed")
+		return detail ~= "" and (base .. ": " .. detail) or base
+	end
+
+	if code == "binary_remove_failed" then
+		local detail = compact_detail(result and result.detail)
+		local base = i18n.translate(lang, "binary_remove_failed")
+		return detail ~= "" and (base .. ": " .. detail) or base
 	end
 
 	if code == "service_script_missing" then

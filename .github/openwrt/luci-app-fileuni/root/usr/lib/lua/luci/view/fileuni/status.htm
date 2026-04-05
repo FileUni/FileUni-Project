@@ -12,6 +12,7 @@ local notice = backend.notice or {}
 local service = backend.service or {}
 local binary = backend.binary or {}
 local architecture = backend.architecture or {}
+local requirements = backend.requirements or {}
 local releases = backend.releases or {}
 local actions = backend.actions or {}
 %>
@@ -117,7 +118,27 @@ local actions = backend.actions or {}
 			<div class="td left" width="33%"><%= pcdata(labels.current_architecture or "Current architecture") %></div>
 			<div class="td left"><%= pcdata(architecture.text or "Unknown") %></div>
 		</div>
-	</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%= pcdata(labels.opkg_architecture or "opkg primary architecture") %></div>
+			<div class="td left"><%= pcdata(architecture.opkg_primary_arch or "-") %></div>
+		</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%= pcdata(labels.opkg_arch_list or "opkg architectures") %></div>
+			<div class="td left"><%= pcdata(table.concat(architecture.opkg_architectures or {}, ", ")) %></div>
+		</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%= pcdata(labels.opkg_status or "opkg status") %></div>
+			<div class="td left"><%= pcdata(requirements.opkg_text or "Unknown") %></div>
+		</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%= pcdata(labels.download_tool_status or "Download tool") %></div>
+			<div class="td left"><%= pcdata(requirements.download_tool_text or "Unknown") %></div>
+		</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%= pcdata(labels.ca_bundle_status or "CA bundle") %></div>
+			<div class="td left"><%= pcdata(requirements.ca_bundle_text or "Unknown") %></div>
+		</div>
+ 	</div>
 	<div style="margin-top: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
 		<input class="btn cbi-button cbi-button-apply" type="button" value="<%= pcdata(labels.start_service or 'Start') %>" onclick='fileuniSubmitAction(<%= json.stringify(actions.service_url or "") %>, { action: "start" })' <%= binary.missing and 'disabled="disabled"' or '' %> />
 		<input class="btn cbi-button" type="button" value="<%= pcdata(labels.stop_service or 'Stop') %>" onclick='fileuniSubmitAction(<%= json.stringify(actions.service_url or "") %>, { action: "stop" })' />

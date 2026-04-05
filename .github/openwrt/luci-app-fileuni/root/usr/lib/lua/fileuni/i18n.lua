@@ -198,6 +198,10 @@ local translations = {
 		en = "Disabled",
 		zh_cn = "已禁用",
 	},
+	available = {
+		en = "Available",
+		zh_cn = "可用",
+	},
 	binary_path = {
 		en = "Binary path",
 		zh_cn = "二进制路径",
@@ -225,6 +229,26 @@ local translations = {
 	current_architecture = {
 		en = "Current architecture",
 		zh_cn = "当前架构",
+	},
+	opkg_architecture = {
+		en = "opkg primary architecture",
+		zh_cn = "opkg 主架构",
+	},
+	opkg_arch_list = {
+		en = "opkg architectures",
+		zh_cn = "opkg 架构列表",
+	},
+	opkg_status = {
+		en = "opkg status",
+		zh_cn = "opkg 状态",
+	},
+	download_tool_status = {
+		en = "Download tool",
+		zh_cn = "下载工具",
+	},
+	ca_bundle_status = {
+		en = "CA bundle",
+		zh_cn = "CA 证书包",
 	},
 	start_service = {
 		en = "Start",
@@ -305,6 +329,26 @@ local translations = {
 	release_fetch_failed = {
 		en = "Failed to query the latest release list from fileuni.com.",
 		zh_cn = "从 fileuni.com 查询最新版本列表失败。",
+	},
+	download_tool_missing = {
+		en = "No supported download tool is available. Install `uclient-fetch`, `wget`, or `curl` first.",
+		zh_cn = "没有可用的下载工具，请先安装 `uclient-fetch`、`wget` 或 `curl`。",
+	},
+	opkg_missing = {
+		en = "`opkg` is not available on this system.",
+		zh_cn = "当前系统没有可用的 `opkg`。",
+	},
+	download_failed = {
+		en = "Failed to download the selected FileUni package",
+		zh_cn = "下载所选 FileUni 包失败",
+	},
+	opkg_install_failed = {
+		en = "`opkg` failed to install the downloaded FileUni package",
+		zh_cn = "`opkg` 安装下载好的 FileUni 包失败",
+	},
+	binary_remove_failed = {
+		en = "Failed to remove the installed FileUni CLI binary",
+		zh_cn = "删除已安装的 FileUni CLI 二进制失败",
 	},
 	service_script_missing = {
 		en = "The FileUni OpenWrt service wrapper is missing.",

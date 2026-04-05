@@ -10,6 +10,10 @@ local PACKAGE_NAME = "fileuni"
 local RELEASES_URL = "https://fileuni.com/api/downloads/releases"
 local SERVICE_SCRIPT = "/etc/init.d/fileuni"
 
+local function command_exists(name)
+	return sys.call("command -v " .. shellquote(name) .. " >/dev/null 2>&1") == 0
+end
+
 local function trim(value)
 	return (tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", ""))
 end
@@ -32,6 +36,10 @@ local function run_shell(script)
 end
 
 local function fetch_text(url)
+	if not command_exists("uclient-fetch") and not command_exists("wget") and not command_exists("curl") then
+		return nil, "No supported download tool found"
+	end
+
 	local quoted_url = shellquote(url)
 	local commands = {
 		"uclient-fetch -T 15 -qO- " .. quoted_url,
@@ -53,6 +61,10 @@ local function fetch_text(url)
 end
 
 local function download_file(url, destination)
+	if not command_exists("uclient-fetch") and not command_exists("wget") and not command_exists("curl") then
+		return nil, "No supported download tool found"
+	end
+
 	local quoted_url = shellquote(url)
 	local quoted_destination = shellquote(destination)
 	local commands = {
@@ -130,16 +142,46 @@ local function binary_version()
 end
 
 local function package_installed()
+	if not command_exists("opkg") then
+		return false
+	end
+
 	return sys.call("opkg status " .. PACKAGE_NAME .. " >/dev/null 2>&1") == 0
+end
+
+local function opkg_environment()
+	local state = {
+		available = command_exists("opkg"),
+		architectures = {},
+		primary_arch = nil,
+	}
+
+	if not state.available then
+		return state
+	end
+
+	local output = trim(sys.exec("opkg print-architecture 2>/dev/null"))
+	for line in output:gmatch("[^\r\n]+") do
+		local arch = trim((line:match("^arch%s+([^%s]+)") or ""))
+		if arch ~= "" then
+			state.architectures[#state.architectures + 1] = arch
+		end
+	end
+
+	state.primary_arch = state.architectures[1] or nil
+	return state
 end
 
 local function detect_architecture()
 	local machine = trim(sys.exec("uname -m 2>/dev/null"))
+	local opkg_state = opkg_environment()
 	local state = {
 		machine = machine ~= "" and machine or "unknown",
 		label = machine ~= "" and machine or "unknown",
 		supported = false,
 		target_id = nil,
+		opkg_architectures = opkg_state.architectures,
+		opkg_primary_arch = opkg_state.primary_arch,
 	}
 
 	if machine == "x86_64" or machine == "amd64" then
@@ -154,13 +196,44 @@ local function detect_architecture()
 		state.label = "i686"
 		state.supported = true
 		state.target_id = "cli-openwrt-x86"
-	elseif machine:match("^armv7") or machine == "armhf" then
+	elseif machine:match("^armv[5-7]") or machine == "armhf" or machine == "arm" then
 		state.label = "armv7"
 		state.supported = true
 		state.target_id = "cli-openwrt-armv7"
 	end
 
+	if not state.supported and opkg_state.primary_arch then
+		local arch = opkg_state.primary_arch
+		if arch:match("aarch64") or arch:match("arm64") then
+			state.label = "aarch64"
+			state.supported = true
+			state.target_id = "cli-openwrt-arm64"
+		elseif arch:match("x86_64") or arch:match("amd64") then
+			state.label = "x86_64"
+			state.supported = true
+			state.target_id = "cli-openwrt-x64"
+		elseif arch:match("i386") or arch:match("i486") or arch:match("i586") or arch:match("i686") or arch == "x86" then
+			state.label = "i686"
+			state.supported = true
+			state.target_id = "cli-openwrt-x86"
+		elseif arch:match("arm") then
+			state.label = "armv7"
+			state.supported = true
+			state.target_id = "cli-openwrt-armv7"
+		end
+	end
+
 	return state
+end
+
+local function check_runtime_requirements()
+	local has_download_tool = command_exists("uclient-fetch") or command_exists("wget") or command_exists("curl")
+	local has_ca_bundle = fs.access("/etc/ssl/certs") or fs.access("/etc/ssl/cert.pem") or fs.access("/etc/ssl/ca-bundle.pem")
+	return {
+		opkg_available = command_exists("opkg"),
+		has_download_tool = has_download_tool,
+		has_ca_bundle = has_ca_bundle,
+	}
 end
 
 local function fetch_release_catalog()
@@ -265,6 +338,7 @@ function M.dashboard_state(cursor)
 	end
 	return {
 		architecture = arch_state,
+		requirements = check_runtime_requirements(),
 		service = {
 			running = service_running(),
 			boot_enabled = service_boot_enabled(),
@@ -379,6 +453,13 @@ end
 
 function M.perform_binary_action(action, channel)
 	if action == "remove" then
+		if not command_exists("opkg") and not fs.access(BINARY_PATH) then
+			return {
+				ok = false,
+				code = "binary_missing",
+			}
+		end
+
 		if fs.access(SERVICE_SCRIPT) then
 			run_shell(shellquote(SERVICE_SCRIPT) .. " stop >/dev/null 2>&1 || true")
 		end
@@ -419,6 +500,20 @@ function M.perform_binary_action(action, channel)
 		return {
 			ok = false,
 			code = "invalid_channel",
+		}
+	end
+
+	if not command_exists("opkg") then
+		return {
+			ok = false,
+			code = "opkg_missing",
+		}
+	end
+
+	if not (command_exists("uclient-fetch") or command_exists("wget") or command_exists("curl")) then
+		return {
+			ok = false,
+			code = "download_tool_missing",
 		}
 	end
 
@@ -470,7 +565,7 @@ function M.perform_binary_action(action, channel)
 		cleanup_path(temp_dir)
 		return {
 			ok = false,
-			code = "binary_install_failed",
+			code = "download_failed",
 			detail = download_detail,
 		}
 	end
@@ -480,7 +575,7 @@ function M.perform_binary_action(action, channel)
 	if not installed then
 		return {
 			ok = false,
-			code = "binary_install_failed",
+			code = "opkg_install_failed",
 			detail = install_detail,
 		}
 	end
