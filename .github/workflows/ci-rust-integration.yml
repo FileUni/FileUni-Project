@@ -494,6 +494,16 @@ jobs:
           chmod +x "${GITHUB_WORKSPACE}/smoke-bundle/fileuni" "${GITHUB_WORKSPACE}/smoke-bundle/fileuni_e2e_server"
           bun run test
 
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: webui-e2e-playwright-artifacts
+          path: |
+            workspace/apps/integration-tests/e2e/test-results/
+            workspace/apps/integration-tests/e2e/playwright-report/
+          if-no-files-found: warn
+
   postgres-disconnect-smoke:
     name: postgres-disconnect-smoke
     runs-on: ubuntu-latest
