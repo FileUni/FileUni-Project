@@ -22,7 +22,7 @@ env:
   WORKSPACE_REPO: FileUni/FileUni-WorkSpace
 
 jobs:
-  official-site-docs-build:
+  official-site-docs-verify:
     runs-on: ubuntu-latest
     steps:
       - name: Resolve workspace ref
@@ -54,8 +54,8 @@ jobs:
           restore-keys: |
             official-site-docs-bun-${{ runner.os }}-
 
-      - name: Build OfficialSiteDocs
+      - name: Verify OfficialSiteDocs
         working-directory: workspace/OfficialSiteDocs
         run: |
           bun install --frozen-lockfile
-          bun run build
+          bun run verify
