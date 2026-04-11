@@ -11,8 +11,8 @@
   },
   "targets": [
     { "target": "x86_64-pc-windows-msvc", "os": "win32", "arch": "x64", "asset_name": "FileUni-gui-x86_64-windows-msvc.exe.zip", "asset_format": "zip", "installed_rel_path": "fileuni-gui.exe", "launch_strategy": "exec" },
-    { "target": "x86_64-unknown-linux-gnu", "os": "linux", "arch": "x64", "libc": "gnu", "asset_name": "FileUni-gui-x86_64-linux-gnu.AppImage", "asset_format": "file", "installed_rel_path": "fileuni-gui.AppImage", "launch_strategy": "exec" },
-    { "target": "aarch64-unknown-linux-gnu", "os": "linux", "arch": "arm64", "libc": "gnu", "asset_name": "FileUni-gui-aarch64-linux-gnu.AppImage", "asset_format": "file", "installed_rel_path": "fileuni-gui.AppImage", "launch_strategy": "exec" },
+    { "target": "x86_64-unknown-linux-gnu", "os": "linux", "arch": "x64", "libc": "gnu", "asset_name": "FileUni-gui-x86_64-linux-gnu.zip", "asset_format": "zip", "installed_rel_path": "fileuni-gui", "launch_strategy": "exec" },
+    { "target": "aarch64-unknown-linux-gnu", "os": "linux", "arch": "arm64", "libc": "gnu", "asset_name": "FileUni-gui-aarch64-linux-gnu.zip", "asset_format": "zip", "installed_rel_path": "fileuni-gui", "launch_strategy": "exec" },
     { "target": "x86_64-apple-darwin", "os": "darwin", "arch": "x64", "asset_name": "FileUni-gui-x86_64-macos-app.zip", "asset_format": "zip", "installed_rel_path": "FileUni UI.app", "launch_strategy": "open" },
     { "target": "aarch64-apple-darwin", "os": "darwin", "arch": "arm64", "asset_name": "FileUni-gui-aarch64-macos-app.zip", "asset_format": "zip", "installed_rel_path": "FileUni UI.app", "launch_strategy": "open" }
   ]

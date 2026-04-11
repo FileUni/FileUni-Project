@@ -115,7 +115,7 @@ def gui_asset_name_for_target(target: str, variant: str = "default") -> str:
     if "apple-darwin" in target:
         return f"{gui_base(target, 'default')}.dmg"
     if "linux" in target:
-        return f"{gui_base(target, 'default')}.AppImage"
+        return f"{gui_base(target, 'default')}.zip"
     raise ValueError(f"Unsupported GUI target for asset naming: {target}")
 
 
@@ -396,7 +396,7 @@ def render_gui_nix_package(
         )
     sources_block = "\n".join(entries)
 
-    return f'''{{ lib, stdenvNoCC, appimageTools, fetchurl }}:
+    return f'''{{ lib, stdenvNoCC, fetchurl, unzip }}:
 
 let
   pname = "fileuni-gui";
@@ -407,13 +407,33 @@ let
   source = sources.${{stdenvNoCC.hostPlatform.system}}
     or (throw "Unsupported system for FileUni GUI: ${{stdenvNoCC.hostPlatform.system}}");
 in
-appimageTools.wrapType2 {{
+stdenvNoCC.mkDerivation {{
   inherit pname version;
 
   src = fetchurl {{
     url = source.url;
     hash = source.hash;
   }};
+
+  nativeBuildInputs = [ unzip ];
+
+  dontConfigure = true;
+  dontBuild = true;
+
+  unpackPhase = ''
+    runHook preUnpack
+    mkdir -p source
+    unzip -q "$src" -d source
+    runHook postUnpack
+  '';
+
+  sourceRoot = "source";
+
+  installPhase = ''
+    runHook preInstall
+    install -Dm755 "$sourceRoot/fileuni-gui" "$out/bin/fileuni-gui"
+    runHook postInstall
+  '';
 
   meta = with lib; {{
     description = "FileUni GUI";

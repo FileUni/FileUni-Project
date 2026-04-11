@@ -11,7 +11,7 @@ on:
         description: "Release name override. Leave empty to use trigger-mode default naming."
         required: false
       build_mode:
-        description: "Build mode: full (all configured platforms) or minimal (CLI musl + GUI x64 AppImage)"
+        description: "Build mode: full (all configured platforms) or minimal (CLI musl + GUI x64 Linux zip)"
         type: choice
         options:
           - full
@@ -826,10 +826,6 @@ jobs:
           cfg['bundle']['icon'] = ['icons/icon.ico', 'icons/icon.png']
           Path('tauri.ci.conf.json').write_text(json.dumps(cfg))
           PY
-          if [[ "${{ matrix.target }}" == *"unknown-linux"* ]]; then
-            export CARGO_PROFILE_RELEASE_STRIP=symbols
-            export CARGO_PROFILE_RELEASE_DEBUG=0
-          fi
           bundles="${{ matrix.bundles }}"
           if [ -n "${bundles}" ]; then
             cargo tauri build --target "${{ matrix.target }}" --bundles "${bundles}" --config tauri.ci.conf.json
@@ -871,6 +867,14 @@ jobs:
             if [ -z "${nsis_file}" ] || [ ! -f "${nsis_file}" ]; then
               nsis_file="$(find workspace/apps/gui/target/${{ matrix.target }}/release/bundle -type f -path '*/nsis*/*.exe' 2>/dev/null | head -1 || true)"
             fi
+          elif [[ "${target}" == *unknown-linux* ]]; then
+            file="workspace/target/${target}/release/fileuni-gui"
+            if [ ! -f "${file}" ]; then
+              file="$(find workspace/target/${target}/release -maxdepth 1 -type f -name 'fileuni-gui' 2>/dev/null | head -1 || true)"
+            fi
+            if [ -z "${file}" ] || [ ! -f "${file}" ]; then
+              file="$(find workspace/apps/gui/target/${target}/release -maxdepth 1 -type f -name 'fileuni-gui' 2>/dev/null | head -1 || true)"
+            fi
           else
             ext="${{ matrix.artifact_ext }}"
             file="$(find workspace/target/${{ matrix.target }}/release/bundle -type f -name "*${ext}" 2>/dev/null | head -1 || true)"
@@ -899,8 +903,12 @@ jobs:
               echo "::error::No GUI artifact found for target ${{ matrix.target }}"
               exit 1
             fi
-            ext="${file##*.}"
-            cp "${file}" "dist/${base}.${ext}"
+            if [[ "${target}" == *unknown-linux* ]]; then
+              zip -j "dist/${base}.zip" "${file}"
+            else
+              ext="${file##*.}"
+              cp "${file}" "dist/${base}.${ext}"
+            fi
             if [[ "${target}" == *apple-darwin* ]]; then
               app_base="$(fileuni_gui_base "${target}" macos-app)"
               app_bundle="$(find workspace/target/${target}/release/bundle -maxdepth 2 -type d -name '*.app' 2>/dev/null | head -1 || true)"
@@ -1173,13 +1181,10 @@ jobs:
 
           for entry in icon_source.iterdir():
               target = res_target / entry.name
-              if target.exists():
-                  if target.is_dir():
-                      shutil.rmtree(target)
-                  else:
-                      target.unlink()
               if entry.is_dir():
-                  shutil.copytree(entry, target)
+                  target.mkdir(parents=True, exist_ok=True)
+                  for source in entry.iterdir():
+                      shutil.copy2(source, target / source.name)
               else:
                   shutil.copy2(entry, target)
 
