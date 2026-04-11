@@ -1306,6 +1306,39 @@ jobs:
           mkdir -p dist
           cp "${apk}" "dist/${base}.apk"
 
+      - name: Print Android APK version metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="${SIGNED_APK:-}"
+          if [ -z "${apk}" ] || [ ! -f "${apk}" ]; then
+            apk="$(find workspace/apps/gui -type f -name '*.apk' | grep -E '(release|unsigned)' | head -1 || true)"
+          fi
+          if [ -z "${apk}" ] || [ ! -f "${apk}" ]; then
+            apk="$(find workspace/apps/gui -type f -name '*.apk' | head -1 || true)"
+          fi
+          if [ -z "${apk}" ] || [ ! -f "${apk}" ]; then
+            echo "::error::No APK artifact found for version inspection"
+            exit 1
+          fi
+
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+          if [ -z "${sdk_root}" ]; then
+            echo "::error::ANDROID_SDK_ROOT/ANDROID_HOME not set"
+            exit 1
+          fi
+          build_tools="${sdk_root}/build-tools/34.0.0"
+          aapt="${build_tools}/aapt"
+          if [ ! -x "${aapt}" ]; then
+            echo "::error::aapt not executable in ${build_tools}"
+            exit 1
+          fi
+
+          badging="$(${aapt} dump badging "${apk}")"
+          version_name="$(printf '%s\n' "${badging}" | python3 -c 'import re,sys; text=sys.stdin.read(); m=re.search(r"versionName=\x27([^\x27]+)\x27", text); print(m.group(1) if m else "")')"
+          version_code="$(printf '%s\n' "${badging}" | python3 -c 'import re,sys; text=sys.stdin.read(); m=re.search(r"versionCode=\x27([^\x27]+)\x27", text); print(m.group(1) if m else "")')"
+          echo "Android APK versionName=${version_name:-unknown} versionCode=${version_code:-unknown}"
+
       - name: Upload GUI Android artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -1610,6 +1643,32 @@ jobs:
 
           mkdir -p dist
           cp "${ipa}" "dist/${base}.ipa"
+
+      - name: Print iOS app version metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$(find workspace/apps/gui/gen/apple/build/Build/Products -type d -name '*.app' | head -1 || true)"
+          if [ -z "${app}" ] || [ ! -d "${app}" ]; then
+            app="$(find workspace/apps/gui/gen/apple/build -type d -name '*.app' | head -1 || true)"
+          fi
+          if [ -z "${app}" ] || [ ! -d "${app}" ]; then
+            app="$(find workspace/apps/gui -type d -name '*.app' | head -1 || true)"
+          fi
+          if [ -z "${app}" ] || [ ! -d "${app}" ]; then
+            echo "::error::No iOS .app bundle found for version inspection"
+            exit 1
+          fi
+
+          plist="${app}/Info.plist"
+          if [ ! -f "${plist}" ]; then
+            echo "::error::Info.plist not found in ${app}"
+            exit 1
+          fi
+
+          short_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${plist}" 2>/dev/null || true)"
+          bundle_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "${plist}" 2>/dev/null || true)"
+          echo "iOS app CFBundleShortVersionString=${short_version:-unknown} CFBundleVersion=${bundle_version:-unknown}"
 
       - name: Upload GUI iOS artifacts
         uses: actions/upload-artifact@v4
