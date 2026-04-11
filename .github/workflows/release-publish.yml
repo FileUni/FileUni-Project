@@ -822,12 +822,7 @@ jobs:
           cfg = json.loads(p.read_text())
           cfg['version'] = "${{ needs.resolve-matrix.outputs.pkg_version }}"
           bundle = cfg.setdefault('bundle', {})
-          target = "${{ matrix.target }}"
-          if target == 'x86_64-pc-windows-msvc':
-            # Windows: build raw .exe only, no msi/nsis bundling
-            bundle['active'] = False
-          else:
-            bundle['active'] = True
+          bundle['active'] = True
           cfg['bundle']['icon'] = ['icons/icon.ico', 'icons/icon.png']
           Path('tauri.ci.conf.json').write_text(json.dumps(cfg))
           PY
@@ -835,10 +830,11 @@ jobs:
             export CARGO_PROFILE_RELEASE_STRIP=symbols
             export CARGO_PROFILE_RELEASE_DEBUG=0
           fi
-          if [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ]; then
-            cargo tauri build --target "${{ matrix.target }}" --config tauri.ci.conf.json
+          bundles="${{ matrix.bundles }}"
+          if [ -n "${bundles}" ]; then
+            cargo tauri build --target "${{ matrix.target }}" --bundles "${bundles}" --config tauri.ci.conf.json
           else
-            cargo tauri build --target "${{ matrix.target }}" --bundles "${{ matrix.bundles }}" --config tauri.ci.conf.json
+            cargo tauri build --target "${{ matrix.target }}" --config tauri.ci.conf.json
           fi
 
       - name: Package GUI artifact
@@ -864,12 +860,16 @@ jobs:
           base="$(fileuni_gui_base "${target}" default)"
 
           if [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ]; then
-            file="workspace/target/${{ matrix.target }}/release/fileuni-gui.exe"
-            if [ ! -f "${file}" ]; then
-              file="$(find workspace/target/${{ matrix.target }}/release -maxdepth 1 -type f -name '*.exe' 2>/dev/null | head -1 || true)"
+            portable_exe="workspace/target/${{ matrix.target }}/release/fileuni-gui.exe"
+            if [ ! -f "${portable_exe}" ]; then
+              portable_exe="$(find workspace/target/${{ matrix.target }}/release -maxdepth 1 -type f -name '*.exe' 2>/dev/null | head -1 || true)"
             fi
-            if [ -z "${file}" ] || [ ! -f "${file}" ]; then
-              file="$(find workspace/apps/gui/target/${{ matrix.target }}/release -maxdepth 1 -type f -name '*.exe' 2>/dev/null | head -1 || true)"
+            if [ -z "${portable_exe}" ] || [ ! -f "${portable_exe}" ]; then
+              portable_exe="$(find workspace/apps/gui/target/${{ matrix.target }}/release -maxdepth 1 -type f -name '*.exe' 2>/dev/null | head -1 || true)"
+            fi
+            nsis_file="$(find workspace/target/${{ matrix.target }}/release/bundle -type f -path '*/nsis*/*.exe' 2>/dev/null | head -1 || true)"
+            if [ -z "${nsis_file}" ] || [ ! -f "${nsis_file}" ]; then
+              nsis_file="$(find workspace/apps/gui/target/${{ matrix.target }}/release/bundle -type f -path '*/nsis*/*.exe' 2>/dev/null | head -1 || true)"
             fi
           else
             ext="${{ matrix.artifact_ext }}"
@@ -878,13 +878,27 @@ jobs:
               file="$(find workspace/apps/gui/target/${{ matrix.target }}/release/bundle -type f -name "*${ext}" 2>/dev/null | head -1 || true)"
             fi
           fi
-          if [ -z "${file}" ] || [ ! -f "${file}" ]; then
-            echo "::error::No GUI artifact found for target ${{ matrix.target }}"
-            exit 1
-          fi
           if [ "${{ matrix.target }}" = "x86_64-pc-windows-msvc" ]; then
-            zip_one "dist/${base}.exe.zip" "${file}"
+            if [ -z "${portable_exe}" ] || [ ! -f "${portable_exe}" ]; then
+              echo "::error::No Windows GUI executable found for target ${target}"
+              exit 1
+            fi
+            zip_one "dist/${base}.exe.zip" "${portable_exe}"
+
+            installer_count=0
+            if [ -n "${nsis_file}" ] && [ -f "${nsis_file}" ]; then
+              cp "${nsis_file}" "dist/${base}.nsis.exe"
+              installer_count=$((installer_count + 1))
+            fi
+            if [ "${installer_count}" -eq 0 ]; then
+              echo "::error::No Windows GUI bundle artifact found for target ${target}"
+              exit 1
+            fi
           else
+            if [ -z "${file}" ] || [ ! -f "${file}" ]; then
+              echo "::error::No GUI artifact found for target ${{ matrix.target }}"
+              exit 1
+            fi
             ext="${file##*.}"
             cp "${file}" "dist/${base}.${ext}"
             if [[ "${target}" == *apple-darwin* ]]; then
