@@ -22,6 +22,7 @@ This directory contains the public-repository workflow entrypoints.
 
 - `prepare-smoke-bundle` builds frontend assets, the `fileuni` binary, and all integration-test executables exactly once.
 - Base smoke scenarios run as individual jobs again, so the Actions UI still shows one card per test.
+- Frontend contract coverage stays in the Rust smoke lane through `web_api_frontend_contract_smoke`, so task-shape and API contract regressions are caught without a separate build path.
 - PostgreSQL, Redis, mail, and `rclone` scenarios remain isolated per test case while reusing the same prebuilt bundle.
 
 This keeps per-test visibility without repeating frontend and Rust compilation in every job.

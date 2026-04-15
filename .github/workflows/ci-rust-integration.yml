@@ -136,6 +136,7 @@ jobs:
             gui_shared_commands_smoke \
             gui_tooling_smoke \
             service_manager_smoke \
+            web_api_frontend_contract_smoke \
             web_api_low_resource_smoke \
             web_api_low_resource_restart_smoke \
             web_api_boundary_smoke \
@@ -238,6 +239,8 @@ jobs:
             test_name: gui_tooling_smoke
           - job_name: service-manager-smoke
             test_name: service_manager_smoke
+          - job_name: web-api-frontend-contract-smoke
+            test_name: web_api_frontend_contract_smoke
           - job_name: web-api-boundary-smoke
             test_name: web_api_boundary_smoke
           - job_name: user-account-smoke
@@ -288,6 +291,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/${{ matrix.test_name }}"
           "smoke-bundle/${{ matrix.test_name }}" --nocapture
 
@@ -320,6 +324,7 @@ jobs:
           test -n "${TOKEN_ZEROSS_EAB_KID:-}"
           test -n "${TOKEN_ZEROSS_EAB_KEY:-}"
 
+          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/domain_acme_ddns_real_cloudflare_zerossl_smoke"
           "smoke-bundle/domain_acme_ddns_real_cloudflare_zerossl_smoke" --ignored --nocapture
 
@@ -394,6 +399,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/${{ matrix.test_name }}"
           "smoke-bundle/${{ matrix.test_name }}" --nocapture
 
@@ -477,6 +483,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/mail_docker_smoke"
           "smoke-bundle/mail_docker_smoke" --nocapture
 
@@ -525,6 +532,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/${{ matrix.test_name }}"
           "smoke-bundle/${{ matrix.test_name }}" --nocapture
 
@@ -567,6 +575,7 @@ jobs:
           FILEUNI_E2E_SERVER_COMMAND: ${{ github.workspace }}/smoke-bundle/fileuni_e2e_server --port 4010
         run: |
           chmod +x "${GITHUB_WORKSPACE}/smoke-bundle/fileuni" "${GITHUB_WORKSPACE}/smoke-bundle/fileuni_e2e_server"
+          test -x "$FILEUNI_TEST_BINARY"
           bun run test
 
       - name: Upload web UI E2E step screenshots
@@ -665,6 +674,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/web_api_smoke"
           "smoke-bundle/web_api_smoke" web_api_smoke_handles_postgres_disconnect_and_recovery --nocapture
 
@@ -754,6 +764,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          test -x "$FILEUNI_TEST_BINARY"
           "smoke-bundle/${{ matrix.test_name }}" --nocapture
 
   redis-disconnect-smoke:
@@ -806,6 +817,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/web_api_smoke"
           "smoke-bundle/web_api_smoke" web_api_smoke_handles_redis_disconnect_and_recovery --nocapture
 
@@ -838,6 +850,7 @@ jobs:
         run: |
           set -euo pipefail
 
+          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/wal_recovery_smoke"
           "smoke-bundle/wal_recovery_smoke" wal_recovery_smoke_handles_real_inflight_stream_upload_when_enabled --nocapture
 
@@ -863,5 +876,6 @@ jobs:
         run: |
           set -euo pipefail
 
+          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/web_api_boundary_smoke"
           "smoke-bundle/web_api_boundary_smoke" web_api_boundary_smoke_covers_heavy_large_file_streaming_upload --nocapture
