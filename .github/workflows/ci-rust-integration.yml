@@ -288,6 +288,14 @@ jobs:
           name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
           path: smoke-bundle
 
+      - name: Install 7z
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq p7zip-full
+          7z i | sed -n '1,12p'
+
       - name: Run smoke test
         shell: bash
         env:
@@ -397,6 +405,14 @@ jobs:
         with:
           name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
           path: smoke-bundle
+
+      - name: Install 7z
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq p7zip-full
+          7z i | sed -n '1,12p'
 
       - name: Run smoke test
         shell: bash
