@@ -137,6 +137,7 @@ jobs:
             gui_tooling_smoke \
             service_manager_smoke \
             web_api_frontend_contract_smoke \
+            web_api_postgres_contract_smoke \
             web_api_low_resource_smoke \
             web_api_low_resource_restart_smoke \
             web_api_boundary_smoke \
@@ -241,6 +242,8 @@ jobs:
             test_name: service_manager_smoke
           - job_name: web-api-frontend-contract-smoke
             test_name: web_api_frontend_contract_smoke
+          - job_name: web-api-postgres-contract-smoke
+            test_name: web_api_postgres_contract_smoke
           - job_name: web-api-boundary-smoke
             test_name: web_api_boundary_smoke
           - job_name: user-account-smoke
@@ -355,6 +358,12 @@ jobs:
             kv_backend: database
           - job_name: nextcloud-smoke-postgres-redis
             test_name: nextcloud_smoke
+            kv_backend: redis
+          - job_name: web-api-contract-postgres-database
+            test_name: web_api_postgres_contract_smoke
+            kv_backend: database
+          - job_name: web-api-contract-postgres-redis
+            test_name: web_api_postgres_contract_smoke
             kv_backend: redis
     services:
       postgres:
