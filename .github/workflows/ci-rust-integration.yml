@@ -330,6 +330,16 @@ jobs:
           - job_name: public-share-nextcloud-contract-smoke
             test_name: public_share_nextcloud_contract_smoke
     steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.prepare-smoke-bundle.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
       - name: Download smoke bundle artifact
         uses: actions/download-artifact@v4
         with:
@@ -363,6 +373,16 @@ jobs:
     needs: prepare-smoke-bundle
     timeout-minutes: 180
     steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.prepare-smoke-bundle.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
       - name: Download smoke bundle artifact
         uses: actions/download-artifact@v4
         with:
@@ -448,6 +468,16 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.prepare-smoke-bundle.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
       - name: Download smoke bundle artifact
         uses: actions/download-artifact@v4
         with:
@@ -533,6 +563,16 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.prepare-smoke-bundle.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
       - name: Download smoke bundle artifact
         uses: actions/download-artifact@v4
         with:
@@ -578,6 +618,16 @@ jobs:
           - job_name: remote-mount-timeout-smoke
             test_name: remote_mount_timeout_smoke
     steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.prepare-smoke-bundle.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
       - name: Download smoke bundle artifact
         uses: actions/download-artifact@v4
         with:
@@ -614,12 +664,6 @@ jobs:
     needs: prepare-smoke-bundle
     timeout-minutes: 90
     steps:
-      - name: Download smoke bundle artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
-          path: smoke-bundle
-
       - name: Checkout workspace
         uses: actions/checkout@v4
         with:
@@ -629,6 +673,12 @@ jobs:
           path: workspace
           submodules: true
           fetch-depth: 0
+
+      - name: Download smoke bundle artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ env.SMOKE_BUNDLE_ARTIFACT }}
+          path: smoke-bundle
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -817,6 +867,16 @@ jobs:
     needs: prepare-smoke-bundle
     timeout-minutes: 90
     steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.prepare-smoke-bundle.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
+          path: workspace
+          submodules: true
+          fetch-depth: 0
+
       - name: Download smoke bundle artifact
         uses: actions/download-artifact@v4
         with:
