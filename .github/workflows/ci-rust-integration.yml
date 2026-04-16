@@ -354,6 +354,41 @@ jobs:
           sudo apt-get install -y -qq p7zip-full
           7z i | sed -n '1,12p'
 
+      - name: Diagnose smoke binary launch
+        if: matrix.test_name == 'cli_edge_smoke' || matrix.test_name == 'runtime_context_smoke'
+        shell: bash
+        env:
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+        run: |
+          set -euo pipefail
+
+          export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni"
+          printf 'pwd=%s\n' "$PWD"
+          uname -a || true
+          printf 'FILEUNI_TEST_BINARY=%s\n' "$FILEUNI_TEST_BINARY"
+          env | sort | grep -E '^(CI|GITHUB|RUNNER|RUST|FILEUNI)_' || true
+
+          ls -lah smoke-bundle || true
+          file "smoke-bundle/${{ matrix.test_name }}" "$FILEUNI_TEST_BINARY" || true
+          readelf -l "smoke-bundle/${{ matrix.test_name }}" | grep -i interpreter || true
+          readelf -l "$FILEUNI_TEST_BINARY" | grep -i interpreter || true
+          ldd "smoke-bundle/${{ matrix.test_name }}" || true
+          ldd "$FILEUNI_TEST_BINARY" || true
+
+          chmod +x "smoke-bundle/fileuni" "smoke-bundle/${{ matrix.test_name }}"
+
+          set +e
+          "$FILEUNI_TEST_BINARY" --help > /tmp/fileuni-help.log 2>&1
+          fileuni_help_status=$?
+          "smoke-bundle/${{ matrix.test_name }}" --help > /tmp/${{ matrix.test_name }}-help.log 2>&1
+          test_help_status=$?
+          set -e
+
+          printf 'fileuni --help exit=%s\n' "$fileuni_help_status"
+          sed -n '1,120p' /tmp/fileuni-help.log || true
+          printf '%s --help exit=%s\n' "${{ matrix.test_name }}" "$test_help_status"
+          sed -n '1,120p' /tmp/${{ matrix.test_name }}-help.log || true
+
       - name: Run smoke test
         shell: bash
         env:
