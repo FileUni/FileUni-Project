@@ -804,6 +804,16 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
+      - name: Sync favicon
+        run: bash workspace/script/fileSync.sh
+
+      - name: Build frontend assets for Tauri E2E
+        working-directory: workspace/frontends
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+          test -f dist/index.html
+
       - name: Setup Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
