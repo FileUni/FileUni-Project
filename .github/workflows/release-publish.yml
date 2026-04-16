@@ -337,6 +337,14 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential pkg-config clang mold
+
       - name: Install cargo-dist
         uses: taiki-e/install-action@v2
         with:
@@ -573,6 +581,13 @@ jobs:
         with:
           targets: ${{ matrix.target }}
 
+      - name: Install system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential pkg-config clang mold
+
       - name: Install cross
         uses: taiki-e/install-action@v2
         with:
@@ -675,6 +690,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - name: Install system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential pkg-config clang mold
 
       - name: Setup Android SDK/NDK
         uses: android-actions/setup-android@v3
@@ -804,7 +826,9 @@ jobs:
             libappindicator3-dev \
             librsvg2-dev \
             xdg-utils \
-            patchelf
+            patchelf \
+            clang \
+            mold
 
       - name: Install cargo-tauri CLI
         uses: taiki-e/install-action@v2
@@ -1062,6 +1086,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - name: Install system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq build-essential pkg-config clang mold
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -1374,6 +1405,11 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+
+      - name: Install system dependencies
+        run: |
+          set -euo pipefail
+          brew install llvm mold
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
