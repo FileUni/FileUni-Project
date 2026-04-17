@@ -433,8 +433,8 @@ jobs:
 
           export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni"
           printf 'FILEUNI_TEST_BINARY=%s\n' "$FILEUNI_TEST_BINARY"
-          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/${{ matrix.test_name }}"
+          test -x \"$FILEUNI_TEST_BINARY\"
           "smoke-bundle/${{ matrix.test_name }}" --nocapture 2>&1 | tee "/tmp/${{ matrix.test_name }}.log"
 
   real-domain-smoke:
@@ -478,8 +478,8 @@ jobs:
           test -n "${TOKEN_ZEROSS_EAB_KID:-}"
           test -n "${TOKEN_ZEROSS_EAB_KEY:-}"
 
-          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/domain_acme_ddns_real_cloudflare_zerossl_smoke"
+          test -x \"$FILEUNI_TEST_BINARY\"
           "smoke-bundle/domain_acme_ddns_real_cloudflare_zerossl_smoke" --ignored --nocapture 2>&1 | tee "/tmp/domain_acme_ddns_real_cloudflare_zerossl_smoke.log"
 
   postgres-smoke:
@@ -579,8 +579,8 @@ jobs:
 
           export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni"
           printf 'FILEUNI_TEST_BINARY=%s\n' "$FILEUNI_TEST_BINARY"
-          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/${{ matrix.test_name }}"
+          test -x \"$FILEUNI_TEST_BINARY\"
           "smoke-bundle/${{ matrix.test_name }}" --nocapture 2>&1 | tee "/tmp/${{ matrix.test_name }}.log"
 
   mail-smoke:
@@ -675,8 +675,8 @@ jobs:
 
           export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni"
           printf 'FILEUNI_TEST_BINARY=%s\n' "$FILEUNI_TEST_BINARY"
-          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/mail_docker_smoke"
+          test -x \"$FILEUNI_TEST_BINARY\"
           "smoke-bundle/mail_docker_smoke" --nocapture 2>&1 | tee "/tmp/mail_docker_smoke.log"
 
   remote-mount-smoke:
@@ -732,8 +732,8 @@ jobs:
 
           export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni"
           printf 'FILEUNI_TEST_BINARY=%s\n' "$FILEUNI_TEST_BINARY"
-          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/${{ matrix.test_name }}"
+          test -x \"$FILEUNI_TEST_BINARY\"
           "smoke-bundle/${{ matrix.test_name }}" --nocapture 2>&1 | tee "/tmp/${{ matrix.test_name }}.log"
 
   webui-e2e:
@@ -1015,8 +1015,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/web_api_smoke"
+          test -x \"$FILEUNI_TEST_BINARY\"
           "smoke-bundle/web_api_smoke" web_api_smoke_handles_postgres_disconnect_and_recovery --nocapture
 
       - name: Cleanup PostgreSQL container
@@ -1158,8 +1158,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/web_api_smoke"
+          test -x \"$FILEUNI_TEST_BINARY\"
           "smoke-bundle/web_api_smoke" web_api_smoke_handles_redis_disconnect_and_recovery --nocapture
 
       - name: Cleanup Redis container
@@ -1191,8 +1191,8 @@ jobs:
         run: |
           set -euo pipefail
 
-          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/wal_recovery_smoke"
+          test -x \"$FILEUNI_TEST_BINARY\"
           "smoke-bundle/wal_recovery_smoke" wal_recovery_smoke_handles_real_inflight_stream_upload_when_enabled --nocapture
 
   large-file-heavy-smoke:
@@ -1217,6 +1217,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          test -x "$FILEUNI_TEST_BINARY"
           chmod +x "smoke-bundle/fileuni" "smoke-bundle/web_api_boundary_smoke"
+          test -x \"$FILEUNI_TEST_BINARY\"
           "smoke-bundle/web_api_boundary_smoke" web_api_boundary_smoke_covers_heavy_large_file_streaming_upload --nocapture
