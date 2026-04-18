@@ -159,7 +159,7 @@ cd frontends && bun run verify
 | Category | Modules |
 |----------|---------|
 | Core | `fileuni-lib`, `yh-database`, `yh-response`, `yh-api-middlewares` |
-| Config | `yh-config-aggregator`, `yh-config-infra`, `yh-config-macros`, `yh-config-mode-api` |
+| Config | `yh-config-aggregator`, `yh-config-infra`, `yh-config-macros` |
 | File Storage | [yh-filemanager-vfs-storage-hub](https://github.com/FileUni/yh-filemanager-vfs-storage-hub) (VFS core) |
 | File Protocols | `yh-file-manager-serv-api`, `serv-s3`, `serv-webdav`, `serv-ftp`, `serv-sftp` |
 | User | `yh-user-center` |
