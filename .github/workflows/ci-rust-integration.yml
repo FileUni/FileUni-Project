@@ -151,6 +151,13 @@ jobs:
               cat "$bundle_dir/build.jsonl"
               exit 1
             }
+          echo "=== Building fileuni_test_server ==="
+          cargo build --locked -p fileuni-integration-tests --bin fileuni_test_server --message-format=json 2>&1 \
+            >> "$bundle_dir/build.jsonl" || {
+              echo "=== Build failed ==="
+              cat "$bundle_dir/build.jsonl"
+              exit 1
+            }
           echo "=== Building tests ==="
           cargo build --locked -p fileuni-integration-tests --tests --message-format=json 2>&1 \
             >> "$bundle_dir/build.jsonl" || {
@@ -184,6 +191,7 @@ jobs:
 
           install_compiler_artifact fileuni "$bundle_dir/fileuni"
           install_compiler_artifact fileuni_e2e_server "$bundle_dir/fileuni_e2e_server"
+          install_compiler_artifact fileuni_test_server "$bundle_dir/fileuni_test_server"
 
           jq -r 'select(.reason == "compiler-artifact" and .profile.test == true and (.target.kind[]? == "test") and .executable != null) | [.target.name, .executable] | @tsv' "$bundle_dir/build.jsonl" \
             | while IFS=$'\t' read -r test_name executable_path; do
@@ -388,11 +396,11 @@ jobs:
         if: matrix.test_name == 'cli_edge_smoke' || matrix.test_name == 'runtime_context_smoke' || matrix.test_name == 'cli_runtime_smoke' || matrix.test_name == 'service_manager_smoke' || matrix.test_name == 'website_smoke' || matrix.test_name == 'web_api_smoke'
         shell: bash
         env:
-          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni_test_server
         run: |
           set -euo pipefail
 
-          export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni"
+          export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni_test_server"
           printf 'pwd=%s\n' "$PWD"
           uname -a || true
           printf 'FILEUNI_TEST_BINARY=%s\n' "$FILEUNI_TEST_BINARY"
@@ -405,7 +413,7 @@ jobs:
           ldd "smoke-bundle/${{ matrix.test_name }}" || true
           ldd "$FILEUNI_TEST_BINARY" || true
 
-          chmod +x "smoke-bundle/fileuni" "smoke-bundle/${{ matrix.test_name }}"
+          chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/${{ matrix.test_name }}"
 
           set +e
           "$FILEUNI_TEST_BINARY" --help > /tmp/fileuni-help.log 2>&1
@@ -422,15 +430,15 @@ jobs:
       - name: Run smoke test
         shell: bash
         env:
-          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni_test_server
           RUST_BACKTRACE: 1
           RUST_TEST_THREADS: 1
         run: |
           set -euo pipefail
 
-          export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni"
+          export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni_test_server"
           printf 'FILEUNI_TEST_BINARY=%s\n' "$FILEUNI_TEST_BINARY"
-          chmod +x "smoke-bundle/fileuni" "smoke-bundle/${{ matrix.test_name }}"
+          chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/${{ matrix.test_name }}"
           test -x "$FILEUNI_TEST_BINARY"
           "smoke-bundle/${{ matrix.test_name }}" --no-capture 2>&1 | tee "/tmp/${{ matrix.test_name }}.log"
 
@@ -459,7 +467,7 @@ jobs:
       - name: Run real domain smoke test
         shell: bash
         env:
-          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni_test_server
           FILEUNI_RUN_REAL_DOMAIN_TESTS: 1
           TOKEN_CF: ${{ secrets.TOKEN_CF }}
           TOKEN_ZEROSS_EAB_KID: ${{ secrets.TOKEN_ZEROSS_EAB_KID }}
@@ -469,7 +477,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni"
+          export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni_test_server"
           printf 'FILEUNI_TEST_BINARY=%s\n' "$FILEUNI_TEST_BINARY"
           test -n "${TOKEN_CF:-}"
           test -n "${TOKEN_ZEROSS_EAB_KID:-}"
@@ -564,7 +572,7 @@ jobs:
       - name: Run smoke test
         shell: bash
         env:
-          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni_test_server
           FILEUNI_TEST_DB_BACKEND: postgres
           FILEUNI_TEST_KV_BACKEND: ${{ matrix.kv_backend }}
           FILEUNI_TEST_KV_REDIS_URL: redis://127.0.0.1:6379/0
@@ -574,9 +582,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni"
+          export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni_test_server"
           printf 'FILEUNI_TEST_BINARY=%s\n' "$FILEUNI_TEST_BINARY"
-          chmod +x "smoke-bundle/fileuni" "smoke-bundle/${{ matrix.test_name }}"
+          chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/${{ matrix.test_name }}"
           test -x "$FILEUNI_TEST_BINARY"
           "smoke-bundle/${{ matrix.test_name }}" --no-capture 2>&1 | tee "/tmp/${{ matrix.test_name }}.log"
 
@@ -653,7 +661,7 @@ jobs:
       - name: Run smoke test
         shell: bash
         env:
-          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni_test_server
           FILEUNI_TEST_DB_BACKEND: ${{ matrix.db_backend }}
           FILEUNI_TEST_KV_BACKEND: ${{ matrix.kv_backend }}
           FILEUNI_TEST_KV_REDIS_URL: redis://127.0.0.1:6379/0
@@ -672,7 +680,7 @@ jobs:
 
           export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni"
           printf 'FILEUNI_TEST_BINARY=%s\n' "$FILEUNI_TEST_BINARY"
-          chmod +x "smoke-bundle/fileuni" "smoke-bundle/mail_docker_smoke"
+          chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/mail_docker_smoke"
           test -x "$FILEUNI_TEST_BINARY"
           "smoke-bundle/mail_docker_smoke" --no-capture 2>&1 | tee "/tmp/mail_docker_smoke.log"
 
@@ -767,11 +775,11 @@ jobs:
       - name: Run web UI E2E test
         working-directory: workspace/apps/integration-tests/e2e
         env:
-          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni_test_server
           FILEUNI_E2E_BASE_URL: http://127.0.0.1:4010
           FILEUNI_E2E_SERVER_COMMAND: FILEUNI_E2E_ENABLE_FILE_COMPRESS=1 FILEUNI_E2E_ENABLE_CHAT=1 FILEUNI_E2E_ENABLE_CHAT_WS=1 FILEUNI_E2E_ENABLE_EMAIL=1 ${{ github.workspace }}/smoke-bundle/fileuni_e2e_server --port 4010
         run: |
-          chmod +x "${GITHUB_WORKSPACE}/smoke-bundle/fileuni" "${GITHUB_WORKSPACE}/smoke-bundle/fileuni_e2e_server"
+          chmod +x "${GITHUB_WORKSPACE}/smoke-bundle/fileuni_test_server" "${GITHUB_WORKSPACE}/smoke-bundle/fileuni_e2e_server"
           test -x "$FILEUNI_TEST_BINARY"
           bun run test
 
@@ -1012,7 +1020,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          chmod +x "smoke-bundle/fileuni" "smoke-bundle/web_api_smoke"
+          chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/web_api_smoke"
           test -x "$FILEUNI_TEST_BINARY"
           "smoke-bundle/web_api_smoke" web_api_smoke_handles_postgres_disconnect_and_recovery --no-capture
 
@@ -1144,7 +1152,7 @@ jobs:
       - name: Run Redis disconnect smoke test
         shell: bash
         env:
-          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni_test_server
           FILEUNI_TEST_KV_BACKEND: redis
           FILEUNI_TEST_KV_REDIS_URL: redis://127.0.0.1:56379/0
           FILEUNI_TEST_ENABLE_REDIS_DISCONNECT: 1
@@ -1155,7 +1163,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          chmod +x "smoke-bundle/fileuni" "smoke-bundle/web_api_smoke"
+          chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/web_api_smoke"
           test -x "$FILEUNI_TEST_BINARY"
           "smoke-bundle/web_api_smoke" web_api_smoke_handles_redis_disconnect_and_recovery --no-capture
 
@@ -1181,14 +1189,14 @@ jobs:
       - name: Run inflight WAL recovery smoke test
         shell: bash
         env:
-          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni_test_server
           FILEUNI_TEST_ENABLE_WAL_INFLIGHT: 1
           RUST_BACKTRACE: 1
           RUST_TEST_THREADS: 1
         run: |
           set -euo pipefail
 
-          chmod +x "smoke-bundle/fileuni" "smoke-bundle/wal_recovery_smoke"
+          chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/wal_recovery_smoke"
           test -x "$FILEUNI_TEST_BINARY"
           "smoke-bundle/wal_recovery_smoke" wal_recovery_smoke_handles_real_inflight_stream_upload_when_enabled --no-capture
 
@@ -1207,13 +1215,13 @@ jobs:
       - name: Run heavy large-file boundary smoke test
         shell: bash
         env:
-          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni
+          FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni_test_server
           FILEUNI_TEST_HEAVY_LARGE_FILE_GIB: 2
           RUST_BACKTRACE: 1
           RUST_TEST_THREADS: 1
         run: |
           set -euo pipefail
 
-          chmod +x "smoke-bundle/fileuni" "smoke-bundle/web_api_boundary_smoke"
+          chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/web_api_boundary_smoke"
           test -x "$FILEUNI_TEST_BINARY"
           "smoke-bundle/web_api_boundary_smoke" web_api_boundary_smoke_covers_heavy_large_file_streaming_upload --no-capture
