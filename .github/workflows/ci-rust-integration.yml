@@ -493,7 +493,7 @@ jobs:
           test -n "${TOKEN_ZEROSS_EAB_KID:-}"
           test -n "${TOKEN_ZEROSS_EAB_KEY:-}"
 
-          chmod +x "smoke-bundle/fileuni" "smoke-bundle/domain_acme_ddns_real_cloudflare_zerossl_smoke"
+          chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/domain_acme_ddns_real_cloudflare_zerossl_smoke"
           test -x "$FILEUNI_TEST_BINARY"
           "smoke-bundle/domain_acme_ddns_real_cloudflare_zerossl_smoke" --ignored --no-capture 2>&1 | tee "/tmp/domain_acme_ddns_real_cloudflare_zerossl_smoke.log"
 
@@ -690,7 +690,7 @@ jobs:
 
           export FILEUNI_TEST_BINARY="$GITHUB_WORKSPACE/smoke-bundle/fileuni"
           printf 'FILEUNI_TEST_BINARY=%s\n' "$FILEUNI_TEST_BINARY"
-          chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/mail_docker_smoke"
+          chmod +x "smoke-bundle/fileuni" "smoke-bundle/mail_docker_smoke"
           test -x "$FILEUNI_TEST_BINARY"
           "smoke-bundle/mail_docker_smoke" --no-capture 2>&1 | tee "/tmp/mail_docker_smoke.log"
 
@@ -1060,7 +1060,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          chmod +x "smoke-bundle/fileuni_test_server" "smoke-bundle/web_api_smoke"
+          chmod +x "smoke-bundle/fileuni" "smoke-bundle/web_api_smoke"
           test -x "$FILEUNI_TEST_BINARY"
           "smoke-bundle/web_api_smoke" web_api_smoke_handles_postgres_disconnect_and_recovery --no-capture
 
