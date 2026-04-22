@@ -300,6 +300,38 @@ jobs:
           name: frontend-dist
           path: workspace/frontends/dist
 
+  build-plugin-fileuni-chat:
+    needs: [resolve-matrix]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout workspace
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.WORKSPACE_REPO }}
+          ref: ${{ needs.resolve-matrix.outputs.workspace_ref }}
+          token: ${{ secrets.FILEUNI_PRIVATE_WORKSPACE_READ_TOKEN }}
+          path: workspace
+          submodules: true
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+
+      - name: Package fileuni-chat plugin
+        working-directory: workspace/examples/plugins/fileuni-chat
+        run: bash scripts/extension-package.sh
+
+      - name: Upload fileuni-chat plugin artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: plugin-fileuni-chat
+          path: workspace/examples/plugins/fileuni-chat/dist/*.zip.fupkg
+          if-no-files-found: error
+
   # ============================================================
   # Tier 1/2: cargo-dist native builds
   # ============================================================
@@ -2452,6 +2484,7 @@ jobs:
         package-linux,
         publish-docker,
         build-pve-ct-template,
+        build-plugin-fileuni-chat,
       ]
     if: ${{ !cancelled() && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     runs-on: ubuntu-latest
@@ -2469,7 +2502,7 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: "{cli-*,gui-*,packages-*,ct-template-*}"
+          pattern: "{cli-*,gui-*,packages-*,ct-template-*,plugin-*}"
           path: /tmp/release
           merge-multiple: true
 
