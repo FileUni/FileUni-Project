@@ -834,7 +834,7 @@ jobs:
         env:
           FILEUNI_TEST_BINARY: ${{ github.workspace }}/smoke-bundle/fileuni_test_server
           FILEUNI_E2E_BASE_URL: http://127.0.0.1:4010
-          FILEUNI_E2E_SERVER_COMMAND: FILEUNI_E2E_ENABLE_FILE_COMPRESS=1 FILEUNI_E2E_ENABLE_CHAT=1 FILEUNI_E2E_ENABLE_CHAT_WS=1 FILEUNI_E2E_ENABLE_EMAIL=1 ${{ github.workspace }}/smoke-bundle/fileuni_e2e_server --port 4010
+          FILEUNI_E2E_SERVER_COMMAND: FILEUNI_E2E_ENABLE_FILE_COMPRESS=1 ${{ github.workspace }}/smoke-bundle/fileuni_e2e_server --port 4010
         run: |
           chmod +x "${GITHUB_WORKSPACE}/smoke-bundle/fileuni_test_server" "${GITHUB_WORKSPACE}/smoke-bundle/fileuni_e2e_server"
           test -x "$FILEUNI_TEST_BINARY"

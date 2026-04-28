@@ -375,7 +375,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq build-essential pkg-config
+          sudo apt-get install -y -qq build-essential pkg-config clang cmake ninja-build
 
       - name: Disable workspace local linker overrides on Linux
         if: runner.os == 'Linux'
@@ -414,9 +414,22 @@ jobs:
           workspaces: workspace
           key: ${{ matrix.target }}
 
+      - name: Prepare libzt runtime (Linux GNU)
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        working-directory: workspace
+        shell: bash
+        run: bash script/prepare-libzt.sh
+
       - name: Build via cargo-dist
+        if: matrix.target != 'x86_64-unknown-linux-gnu'
         working-directory: workspace
         run: dist build --tag="${{ needs.resolve-matrix.outputs.dist_tag }}" --target "${{ matrix.target }}" --artifacts=local
+
+      - name: Build CLI with libzt runtime
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        working-directory: workspace
+        shell: bash
+        run: cargo build --release --package fileuni --features libzt-runtime --target "${{ matrix.target }}"
 
       - name: Fallback build for i686 Windows
         if: matrix.target == 'i686-pc-windows-msvc'
@@ -884,11 +897,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            clang \
+            cmake \
+            ninja-build \
             libwebkit2gtk-4.1-dev \
             libappindicator3-dev \
             librsvg2-dev \
             xdg-utils \
             patchelf
+
+      - name: Prepare libzt runtime (Linux GNU GUI)
+        if: startsWith(matrix.runner, 'ubuntu') && matrix.target == 'x86_64-unknown-linux-gnu'
+        working-directory: workspace
+        shell: bash
+        run: bash script/prepare-libzt.sh
 
       - name: Install cargo-tauri CLI
         uses: taiki-e/install-action@v2
@@ -911,10 +933,14 @@ jobs:
           Path('tauri.ci.conf.json').write_text(json.dumps(cfg))
           PY
           bundles="${{ matrix.bundles }}"
+          feature_args=()
+          if [ "${{ matrix.target }}" = "x86_64-unknown-linux-gnu" ]; then
+            feature_args+=(--features libzt-runtime)
+          fi
           if [ -n "${bundles}" ]; then
-            cargo tauri build --target "${{ matrix.target }}" --bundles "${bundles}" --config tauri.ci.conf.json
+            cargo tauri build --target "${{ matrix.target }}" --bundles "${bundles}" --config tauri.ci.conf.json "${feature_args[@]}"
           else
-            cargo tauri build --target "${{ matrix.target }}" --config tauri.ci.conf.json
+            cargo tauri build --target "${{ matrix.target }}" --config tauri.ci.conf.json "${feature_args[@]}"
           fi
 
       - name: Package GUI artifact
