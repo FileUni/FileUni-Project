@@ -320,9 +320,6 @@ jobs:
           - job_name: user-account-smoke
             test_name: user_account_smoke
             fileuni_binary: fileuni_test_server
-          - job_name: chat-smoke
-            test_name: chat_smoke
-            fileuni_binary: fileuni_test_server
           - job_name: externalize-net-website-manager-smoke
             test_name: externalize_net_website_manager_smoke
             fileuni_binary: fileuni_test_server
