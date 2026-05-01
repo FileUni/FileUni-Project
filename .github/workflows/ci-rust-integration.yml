@@ -867,6 +867,12 @@ jobs:
         run: |
           cargo install --git https://github.com/chippers/msedgedriver-tool
           & "$HOME/.cargo/bin/msedgedriver-tool.exe"
+          $driver = Get-ChildItem -Path $HOME -Filter msedgedriver.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $driver) {
+            throw "msedgedriver.exe not found after msedgedriver-tool run"
+          }
+          Copy-Item $driver.FullName "$HOME/.cargo/bin/msedgedriver.exe" -Force
+          & "$HOME/.cargo/bin/msedgedriver.exe" --version
           "$HOME/.cargo/bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Install Tauri E2E dependencies
@@ -887,7 +893,19 @@ jobs:
         env:
           FILEUNI_TAURI_E2E_RUNTIME_ROOT: ${{ github.workspace }}\workspace\apps\integration-tests\tauri-e2e\.runtime
           RUSTUP_TOOLCHAIN: stable
-        run: bun run test
+        shell: pwsh
+        run: |
+          $tauriDriver = Join-Path $HOME ".cargo\bin\tauri-driver.exe"
+          $edgeDriver = Join-Path $HOME ".cargo\bin\msedgedriver.exe"
+          if (-not (Test-Path $tauriDriver)) {
+            throw "tauri-driver.exe missing at $tauriDriver"
+          }
+          if (-not (Test-Path $edgeDriver)) {
+            throw "msedgedriver.exe missing at $edgeDriver"
+          }
+          & $tauriDriver --version
+          & $edgeDriver --version
+          bun run test
 
   postgres-disconnect-smoke:
     name: postgres-disconnect-smoke
