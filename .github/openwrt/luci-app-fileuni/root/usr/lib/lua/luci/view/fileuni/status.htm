@@ -1,5 +1,24 @@
 <%
-local json = require "luci.jsonc"
+local function js_string(value)
+	local replacements = {
+		['\\'] = '\\\\',
+		['"'] = '\\"',
+		["'"] = "\\u0027",
+		["\b"] = "\\b",
+		["\f"] = "\\f",
+		["\n"] = "\\n",
+		["\r"] = "\\r",
+		["\t"] = "\\t",
+		["<"] = "\\u003C",
+		[">"] = "\\u003E",
+		["&"] = "\\u0026",
+	}
+	local escaped = tostring(value or ""):gsub('[%z\1-\31\\\"\'<>&]', function(ch)
+		return replacements[ch] or string.format("\\u%04x", ch:byte())
+	end)
+	return '"' .. escaped .. '"'
+end
+
 local view = self.fileuni_view or {}
 local language = view.language or {}
 local backend = view.backend or {}
@@ -19,8 +38,8 @@ local actions = backend.actions or {}
 
 <script type="text/javascript">
 	(function() {
-		var host = <%= json.stringify(host) %>;
-		var port = <%= json.stringify(port) %>;
+		var host = <%= js_string(host) %>;
+		var port = <%= js_string(port) %>;
 
 		window.fileuniOpenBackend = function() {
 			var normalized = (host || "").toLowerCase();
@@ -138,13 +157,17 @@ local actions = backend.actions or {}
 			<div class="td left" width="33%"><%= pcdata(labels.ca_bundle_status or "CA bundle") %></div>
 			<div class="td left"><%= pcdata(requirements.ca_bundle_text or "Unknown") %></div>
 		</div>
+		<div class="tr">
+			<div class="td left" width="33%"><%= pcdata(labels.json_parser_status or "JSON parser") %></div>
+			<div class="td left"><%= pcdata(requirements.json_parser_text or "Unknown") %></div>
+		</div>
  	</div>
 	<div style="margin-top: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-		<input class="btn cbi-button cbi-button-apply" type="button" value="<%= pcdata(labels.start_service or 'Start') %>" onclick='fileuniSubmitAction(<%= json.stringify(actions.service_url or "") %>, { action: "start" })' <%= binary.missing and 'disabled="disabled"' or '' %> />
-		<input class="btn cbi-button" type="button" value="<%= pcdata(labels.stop_service or 'Stop') %>" onclick='fileuniSubmitAction(<%= json.stringify(actions.service_url or "") %>, { action: "stop" })' />
-		<input class="btn cbi-button cbi-button-apply" type="button" value="<%= pcdata(labels.install_service or 'Install Service') %>" onclick='fileuniSubmitAction(<%= json.stringify(actions.service_url or "") %>, { action: "install_service" })' <%= binary.missing and 'disabled="disabled"' or '' %> />
-		<input class="btn cbi-button" type="button" value="<%= pcdata(labels.disable_service or 'Disable Service') %>" onclick='fileuniSubmitAction(<%= json.stringify(actions.service_url or "") %>, { action: "disable_service" })' />
-		<input class="btn cbi-button cbi-button-negative" type="button" value="<%= pcdata(labels.remove_binary or 'Remove Binary') %>" onclick='fileuniSubmitAction(<%= json.stringify(actions.binary_url or "") %>, { action: "remove" }, <%= json.stringify(labels.remove_binary_confirm or "Remove the installed FileUni CLI binary?") %>)' <%= not binary.removable and 'disabled="disabled"' or '' %> />
+		<input class="btn cbi-button cbi-button-apply" type="button" value="<%= pcdata(labels.start_service or 'Start') %>" onclick='fileuniSubmitAction(<%= js_string(actions.service_url or "") %>, { action: "start" })' <%= binary.missing and 'disabled="disabled"' or '' %> />
+		<input class="btn cbi-button" type="button" value="<%= pcdata(labels.stop_service or 'Stop') %>" onclick='fileuniSubmitAction(<%= js_string(actions.service_url or "") %>, { action: "stop" })' />
+		<input class="btn cbi-button cbi-button-apply" type="button" value="<%= pcdata(labels.install_service or 'Install Service') %>" onclick='fileuniSubmitAction(<%= js_string(actions.service_url or "") %>, { action: "install_service" })' <%= binary.missing and 'disabled="disabled"' or '' %> />
+		<input class="btn cbi-button" type="button" value="<%= pcdata(labels.disable_service or 'Disable Service') %>" onclick='fileuniSubmitAction(<%= js_string(actions.service_url or "") %>, { action: "disable_service" })' />
+		<input class="btn cbi-button cbi-button-negative" type="button" value="<%= pcdata(labels.remove_binary or 'Remove Binary') %>" onclick='fileuniSubmitAction(<%= js_string(actions.binary_url or "") %>, { action: "remove" }, <%= js_string(labels.remove_binary_confirm or "Remove the installed FileUni CLI binary?") %>)' <%= not binary.removable and 'disabled="disabled"' or '' %> />
 	</div>
 </div>
 
@@ -197,7 +220,7 @@ local actions = backend.actions or {}
 			<p style="margin: 0.85rem 0 0; color: #a94442; line-height: 1.6;"><%= pcdata(release.message) %></p>
 			<% end %>
 			<div style="margin-top: 1rem; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
-				<input class="btn cbi-button cbi-button-apply" type="button" value="<%= pcdata(labels.release_install or 'Install') %>" onclick='fileuniSubmitAction(<%= json.stringify(actions.binary_url or "") %>, { action: "install", channel: <%= json.stringify(release.channel or "stable") %> })' <%= not release.install_enabled and 'disabled="disabled"' or '' %> />
+				<input class="btn cbi-button cbi-button-apply" type="button" value="<%= pcdata(labels.release_install or 'Install') %>" onclick='fileuniSubmitAction(<%= js_string(actions.binary_url or "") %>, { action: "install", channel: <%= js_string(release.channel or "stable") %> })' <%= not release.install_enabled and 'disabled="disabled"' or '' %> />
 				<% if release.details_url and release.details_url ~= "" then %>
 				<a href="<%= pcdata(release.details_url) %>" target="_blank" rel="noopener" class="btn cbi-button" style="text-decoration: none;"><%= pcdata(labels.release_details or "Details") %></a>
 				<% end %>

@@ -140,6 +140,22 @@ local function build_notice_meta()
 	}
 end
 
+local function release_error_message(release_error, arch_state)
+	if type(release_error) ~= "table" then
+		return tr("release_fetch_failed")
+	end
+
+	if release_error.code == "json_parser_missing" then
+		return tr("json_parser_missing")
+	end
+
+	if release_error.code == "unsupported_arch" then
+		return i18n.format(runtime_language, "unsupported_arch_notice", arch_state.machine or "unknown")
+	end
+
+	return tr("release_fetch_failed")
+end
+
 local function build_release_cards(release_state, arch_state)
 	local cards = {}
 
@@ -148,7 +164,7 @@ local function build_release_cards(release_state, arch_state)
 		local message = ""
 
 		if release_state.fetch_error then
-			message = tr("release_fetch_failed")
+			message = release_error_message(release_state.fetch_error, arch_state)
 		elseif not arch_state.supported then
 			message = i18n.format(runtime_language, "unsupported_arch_notice", arch_state.machine or "unknown")
 		elseif not release.available then
@@ -221,6 +237,7 @@ local function build_backend_meta()
 			opkg_text = dashboard.requirements.opkg_available and tr("available") or tr("missing"),
 			download_tool_text = dashboard.requirements.has_download_tool and tr("available") or tr("missing"),
 			ca_bundle_text = dashboard.requirements.has_ca_bundle and tr("available") or tr("missing"),
+			json_parser_text = dashboard.requirements.has_json_parser and tr("available") or tr("missing"),
 		},
 		releases = build_release_cards(dashboard.releases, dashboard.architecture),
 		release_source = dashboard.release_source,
@@ -250,6 +267,7 @@ local function build_backend_meta()
 			opkg_status = tr("opkg_status"),
 			download_tool_status = tr("download_tool_status"),
 			ca_bundle_status = tr("ca_bundle_status"),
+			json_parser_status = tr("json_parser_status"),
 			config_file = tr("config_file"),
 			detected_backend = tr("detected_backend"),
 			config_detected = tr("config_detected"),
@@ -301,7 +319,7 @@ work_dir.rmempty = false
 work_dir.placeholder = default_work_dir
 work_dir.description = tr("work_dir_desc")
 
-function m.on_after_commit(self)
+function m.on_after_commit()
 	local service_script = "/etc/init.d/fileuni"
 	if not fs.access(service_script) then
 		return

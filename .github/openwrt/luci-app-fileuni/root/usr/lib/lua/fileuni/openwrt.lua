@@ -1,6 +1,7 @@
 local fs = require "nixio.fs"
-local json = require "luci.jsonc"
 local sys = require "luci.sys"
+local json_available, json_module = pcall(require, "luci.jsonc")
+local json = json_available and json_module or nil
 
 local M = {}
 
@@ -9,6 +10,10 @@ local DEFAULT_RUNTIME_DIR = "/var/lib/fileuni"
 local PACKAGE_NAME = "fileuni"
 local RELEASES_URL = "https://fileuni.com/api/downloads/releases"
 local SERVICE_SCRIPT = "/etc/init.d/fileuni"
+
+local function shellquote(value)
+	return "'" .. tostring(value or ""):gsub("'", "'\"'\"'") .. "'"
+end
 
 local function command_exists(name)
 	return sys.call("command -v " .. shellquote(name) .. " >/dev/null 2>&1") == 0
@@ -20,10 +25,6 @@ end
 
 local function first_line(value)
 	return trim((tostring(value or ""):match("([^\r\n]+)") or ""))
-end
-
-local function shellquote(value)
-	return "'" .. tostring(value or ""):gsub("'", "'\"'\"'") .. "'"
 end
 
 local function run_shell(script)
@@ -233,10 +234,18 @@ local function check_runtime_requirements()
 		opkg_available = command_exists("opkg"),
 		has_download_tool = has_download_tool,
 		has_ca_bundle = has_ca_bundle,
+		has_json_parser = json ~= nil and type(json.parse) == "function",
 	}
 end
 
 local function fetch_release_catalog()
+	if json == nil or type(json.parse) ~= "function" then
+		return nil, {
+			code = "json_parser_missing",
+			detail = "luci.jsonc is unavailable",
+		}
+	end
+
 	local raw, detail = fetch_text(RELEASES_URL)
 	if not raw then
 		return nil, {

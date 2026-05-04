@@ -250,6 +250,10 @@ local translations = {
 		en = "CA bundle",
 		zh_cn = "CA 证书包",
 	},
+	json_parser_status = {
+		en = "JSON parser",
+		zh_cn = "JSON 解析器",
+	},
 	start_service = {
 		en = "Start",
 		zh_cn = "启动",
@@ -330,6 +334,10 @@ local translations = {
 		en = "Failed to query the latest release list from fileuni.com.",
 		zh_cn = "从 fileuni.com 查询最新版本列表失败。",
 	},
+	json_parser_missing = {
+		en = "The LuCI JSON parser is unavailable. Install `luci-lib-jsonc` or update the FileUni LuCI package.",
+		zh_cn = "LuCI JSON 解析器不可用。请安装 `luci-lib-jsonc`，或更新 FileUni LuCI 包。",
+	},
 	download_tool_missing = {
 		en = "No supported download tool is available. Install `uclient-fetch`, `wget`, or `curl` first.",
 		zh_cn = "没有可用的下载工具，请先安装 `uclient-fetch`、`wget` 或 `curl`。",
@@ -399,12 +407,12 @@ local translations = {
 		zh_cn = "操作已完成。",
 	},
 	admin_reset_hint = {
-		en = "If the admin password is lost, delete `%s/install.lock` and restart FileUni to enter the setup wizard again.",
-		zh_cn = "如果管理员密码丢失，请删除 `%s/install.lock` 后重启 FileUni，重新进入设置向导。",
-		ja = "管理者パスワードを失った场合は `%s/install.lock` を削除してから FileUni を再起动し、再度セットアップウィザードに入ってください。",
-		es = "Si se pierde la contrasena del administrador, elimina `%s/install.lock` y reinicia FileUni para volver a entrar en el asistente de configuracion.",
-		de = "Wenn das Administratorpasswort verloren geht, loesche `%s/install.lock` und starte FileUni neu, um den Einrichtungsassistenten erneut zu oeffnen.",
-		fr = "Si le mot de passe administrateur est perdu, supprime `%s/install.lock` puis redemarre FileUni pour relancer l'assistant de configuration.",
+		en = "If the admin password is lost, run `fileuni reset-admin --user <USER> --password <PASSWORD>` for the instance using runtime dir `%s`.",
+		zh_cn = "如果管理员密码丢失，请对使用运行目录 `%s` 的实例执行 `fileuni reset-admin --user <USER> --password <PASSWORD>`。",
+		ja = "管理者パスワードを失った场合は、ランタイムディレクトリ `%s` を使うインスタンスに対して `fileuni reset-admin --user <USER> --password <PASSWORD>` を実行してください。",
+		es = "Si se pierde la contrasena del administrador, ejecuta `fileuni reset-admin --user <USER> --password <PASSWORD>` para la instancia que usa el directorio de ejecucion `%s`.",
+		de = "Wenn das Administratorpasswort verloren geht, fuehre `fileuni reset-admin --user <USER> --password <PASSWORD>` fuer die Instanz mit Laufzeitverzeichnis `%s` aus.",
+		fr = "Si le mot de passe administrateur est perdu, execute `fileuni reset-admin --user <USER> --password <PASSWORD>` pour l'instance qui utilise le repertoire d'execution `%s`.",
 	},
 	running = {
 		en = "Running",

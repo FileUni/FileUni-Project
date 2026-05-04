@@ -32,6 +32,10 @@ local function failure_message(i18n, lang, result)
 		return i18n.translate(lang, "release_fetch_failed")
 	end
 
+	if code == "json_parser_missing" then
+		return i18n.translate(lang, "json_parser_missing")
+	end
+
 	if code == "download_tool_missing" then
 		return i18n.translate(lang, "download_tool_missing")
 	end

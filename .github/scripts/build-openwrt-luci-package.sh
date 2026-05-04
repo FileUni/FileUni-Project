@@ -29,9 +29,12 @@ config_src="${stage_root}/fileuni-config"
 cp "${stage_root}/pkgroot/etc/config/fileuni" "${config_src}"
 rm -f "${stage_root}/pkgroot/etc/config/fileuni"
 
+postinstall_src="${stage_root}/postinstall.sh"
+cp "${template_root}/scripts/postinstall.sh" "${postinstall_src}"
+
 chmod 0755 \
   "${stage_root}/pkgroot/etc/init.d/fileuni" \
-  "${template_root}/scripts/postinstall.sh"
+  "${postinstall_src}"
 
 nfpm_config="${stage_root}/nfpm-luci-app-fileuni.yaml"
 cat > "${nfpm_config}" <<EOF
@@ -47,6 +50,7 @@ homepage: https://github.com/FileUni
 license: MIT
 depends:
   - luci-base
+  - luci-lib-jsonc
   - uclient-fetch
   - ca-bundle
 contents:
@@ -57,7 +61,7 @@ contents:
     dst: /etc/config/fileuni
     type: config
 scripts:
-  postinstall: ${template_root}/scripts/postinstall.sh
+  postinstall: ${postinstall_src}
 EOF
 
 mkdir -p "${output_dir}"
